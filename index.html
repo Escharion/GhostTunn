@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GhostTunn</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="#home">
+        <span class="brand-mark logo-ring" aria-hidden="true"></span>
+        GhostTunn
+      </a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <nav class="site-nav" id="siteNav">
+        <a href="#features">Features</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#security">Security</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="container">
+        <div class="pin-card panel-card">
+          <div class="pin-content">
+            <p class="eyebrow">Privacy-first communication</p>
+            <h1>Secure, anonymous messaging with Ghost IDs.</h1>
+            <p class="hero-text"><span class="logo-ring logo-ring--inline" aria-hidden="true"></span>GhostTunn gives you encrypted messaging and real-time communication without phone numbers, email, or centralized identity tracking.</p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="#features">Explore Features</a>
+              <button class="btn btn-secondary" id="demoGhostId">Start</button>
+            </div>
+          </div>
+
+          <aside class="pin-meta">
+            <div class="panel-card meta-card">
+              <h2>Your Ghost ID</h2>
+              <p id="ghostIdValue">Click the button to generate a demo Ghost ID.</p>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-features" id="features">
+      <div class="container">
+        <div class="section-header">
+          <p class="eyebrow">Core Features</p>
+          <h2>Designed for privacy, performance, and control.</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h3>Anonymous Identity</h3>
+            <p>Generate a locally stored Ghost ID and public/private key pair. The private key stays on your device.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Encrypted Messaging</h3>
+            <p>Messages encrypt before sending, so only the intended recipient can read them.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Real-Time Delivery</h3>
+            <p>One-to-one messaging, presence status, and session management for live communication.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Invite & Connect</h3>
+            <p>Connect through Ghost IDs, QR codes, or secure invite links — no contact syncing required.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Group Communication</h3>
+            <p>Create and manage groups with role-based permissions and admin controls.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Admin Insights</h3>
+            <p>Administrators can monitor users, sessions, relay health, abuse reports, and delivery analytics.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-architecture" id="architecture">
+      <div class="container architecture-grid">
+        <div>
+          <p class="eyebrow">Architecture</p>
+          <h2>Modern backend infrastructure with full privacy in mind.</h2>
+          <p><span class="logo-ring logo-ring--inline" aria-hidden="true"></span>GhostTunn is built for cross-platform deployment using FastAPI, WebSockets, PostgreSQL, Redis, and Docker-native deployment. The frontend is responsive, accessible, and ready for web, mobile, and desktop.</p>
+        </div>
+        <div class="architecture-list">
+          <div class="architecture-item">
+            <strong>Python + FastAPI</strong>
+            <p>API endpoints, authentication, routing, and secure session handling.</p>
+          </div>
+          <div class="architecture-item">
+            <strong>WebSockets</strong>
+            <p>Real-time messaging, presence updates, and live group communication.</p>
+          </div>
+          <div class="architecture-item">
+            <strong>PostgreSQL + Redis</strong>
+            <p>Persistent delivery state, user metadata, caching, and message routing.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-security" id="security">
+      <div class="container security-grid">
+        <div class="security-copy">
+          <p class="eyebrow">Security & Registration</p>
+          <h2>Security keys are stored here for identity and device adoption.</h2>
+          <p><span class="logo-ring logo-ring--inline" aria-hidden="true"></span>GhostTunn keeps your public, private, identity, and registration keys accessible for secure verification and trusted device onboarding. Copy the key you need to transfer it safely.</p>
+        </div>
+        <div class="security-stats security-key-grid">
+          <div class="stat-card key-card">
+            <div class="key-label">
+              <strong>Public key</strong>
+              <button class="copy-btn" id="copySecurityPublic">Copy</button>
+            </div>
+            <p class="key-value" id="securityPublicKey">#ghost-A1B2-C3D4-E</p>
+            <p>Shared publicly to receive messages from trusted contacts.</p>
+          </div>
+          <div class="stat-card key-card">
+            <div class="key-label">
+              <strong>Private key</strong>
+              <button class="copy-btn" id="copySecurityPrivate">Copy</button>
+            </div>
+            <p class="key-value" id="securityPrivateKey">PRV-7F8E-6D5C-4B3A</p>
+            <p>Kept on your device and used for secure identity verification.</p>
+          </div>
+          <div class="stat-card key-card">
+            <div class="key-label">
+              <strong>Identity key</strong>
+              <button class="copy-btn" id="copySecurityIdentity">Copy</button>
+            </div>
+            <p class="key-value" id="securityIdentityKey">#ghost-A1B2-C3D4-E / PRV-7F8E</p>
+            <p>Used for your encrypted profile and session authentication.</p>
+          </div>
+          <div class="stat-card key-card">
+            <div class="key-label">
+              <strong>Registration key</strong>
+              <button class="copy-btn" id="copyRegistrationKey">Copy</button>
+            </div>
+            <p class="key-value" id="registrationKey">REG-DEVICE-ADOPT-9F2B</p>
+            <p>Use this key when adopting a new device to register securely.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-contact" id="contact">
+      <div class="container contact-panel">
+        <div>
+          <p class="eyebrow">Get Started</p>
+          <h2>Start building privacy-first communication today.</h2>
+          <p><span class="logo-ring logo-ring--inline" aria-hidden="true"></span>GhostTunn is a strong foundation for secure, anonymous messaging without centralized identity tracking.</p>
+        </div>
+        <form class="contact-form" id="contactForm">
+          <label for="email">Stay updated</label>
+          <input type="email" id="email" name="email" placeholder="your@private.example" required />
+          <button class="btn btn-primary" type="submit">Subscribe</button>
+          <p class="form-note">No spam. Privacy-first updates only.</p>
+        </form>
+      </div>
+    </section>
+
+    <section class="section app-shell hidden" id="appShell">
+      <div class="app-container">
+        <nav class="app-sidebar">
+          <div class="sidebar-top">
+            <button class="sidebar-icon" data-view="chat" aria-label="Chats" title="Chats">💬</button>
+            <button class="sidebar-icon" data-view="ghosttime" aria-label="GhostTime" title="GhostTime">📝</button>
+            <button class="sidebar-icon" data-view="terminal" aria-label="Terminal" title="Terminal">⌨️</button>
+          </div>
+        </nav>
+
+        <div class="app-main">
+          <div class="app-header-section">
+            <div class="app-topbar">
+              <h1 class="app-title glow"></h1>
+              <button class="header-icon" id="headerMenuButton">⚙️</button>
+            </div>
+            <div class="search-action-row">
+              <div class="search-bar-container">
+                <input type="search" id="chatSearchInput" class="search-bar" placeholder="Search friends or public ID" />
+              </div>
+              <button class="btn btn-secondary add-friend-button" id="addFriendButton" type="button" title="Add friend by public ID">+</button>
+            </div>
+          </div>
+
+          <div class="view-panel" id="chatView">
+            <div class="chat-view-container">
+              <div class="chat-tabs-bar">
+                <button class="chat-tab active" data-filter="all">All</button>
+                <button class="chat-tab" data-filter="unread">Unread</button>
+                <button class="chat-tab" data-filter="requests">Requests</button>
+              </div>
+              <div class="chat-list" id="chatList"></div>
+            </div>
+          </div>
+
+          <div class="view-panel hidden" id="ghosttimeView">
+            <div class="ghosttime-panel">
+              <div class="ghosttime-header">
+                <h2 class="glow-text glow">GhostTime</h2>
+              </div>
+              <div class="gt-post-form">
+                <textarea id="gtPostText" placeholder="Share a text post..."></textarea>
+                <button class="btn btn-primary" id="publishGtPost">Publish</button>
+              </div>
+              <div class="gt-post-list" id="gtPostList"></div>
+            </div>
+          </div>
+
+          <div class="view-panel hidden" id="terminalView">
+            <div class="terminal-panel">
+              <div class="terminal-header">
+                <div>
+                  <p class="eyebrow">Python Console</p>
+                  <h2><span class="logo-ring logo-ring--inline" aria-hidden="true"></span>GhostTunn shell</h2>
+                </div>
+                <span class="terminal-status">Ready</span>
+              </div>
+              <div class="terminal-output" id="terminalOutput">
+                <div class="terminal-line info">Type <strong>ghost help</strong> to explore messages, identity, privacy, files, and device commands.</div>
+              </div>
+              <div class="terminal-input-row">
+                <span class="terminal-prompt">python&gt;&gt;&gt;</span>
+                <input id="terminalInput" class="terminal-input" type="text" placeholder="Enter command..." autocomplete="off" />
+              </div>
+              <div class="terminal-actions">
+                <button class="btn btn-secondary" id="terminalClear">Clear</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="chat-detail-panel hidden" id="chatDetailPanel">
+          <div class="chat-header">
+            <button class="back-button" id="backToChatListButton">←</button>
+            <div class="chat-header-info">
+              <h2 id="chatDetailTitle">Chat</h2>
+              <p id="chatDetailSubtitle">Online</p>
+            </div>
+          </div>
+          <div class="messages-container" id="messagesContainer"></div>
+          <div class="message-input-area">
+            <input type="text" id="messageInput" placeholder="Type a message..." />
+            <button class="send-button" id="sendButton">Send</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="login-overlay" id="loginOverlay" aria-hidden="true">
+    <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="loginHeading">
+      <div class="login-title">
+        <h1 id="loginHeading" class="glow-text"><span class="logo-ring logo-ring--inline" aria-hidden="true"></span>GhostTunn</h1>
+        <p class="login-subtitle">Your digital keys are generated instantly. Copy them and keep them safe.</p>
+      </div>
+
+      <div class="login-tabs" role="tablist">
+        <button class="login-tab active" data-tab="public" role="tab" aria-selected="true">Public key</button>
+        <button class="login-tab" data-tab="private" role="tab" aria-selected="false">Private key</button>
+        <button class="login-tab" data-tab="identity" role="tab" aria-selected="false">Identity key</button>
+      </div>
+
+      <div class="tab-panels">
+        <div class="tab-panel active" id="publicTab" role="tabpanel">
+          <div class="key-block">
+            <div class="key-label">
+              <strong>Public key</strong>
+              <button class="copy-btn" id="copyPublic">Copy</button>
+            </div>
+            <p class="key-value" id="publicKeyValue">#ghost-...-0000-E</p>
+            <p class="tab-note">Use this as your contact identifier when sharing with others.</p>
+          </div>
+        </div>
+        <div class="tab-panel" id="privateTab" role="tabpanel">
+          <div class="key-block">
+            <div class="key-label">
+              <strong>Private key</strong>
+              <button class="copy-btn" id="copyPrivate">Copy</button>
+            </div>
+            <p class="key-value" id="privateKeyValue">@Ghost-...</p>
+            <p class="tab-note">Keep this secret. It stays on your device and is used to prove your identity.</p>
+          </div>
+        </div>
+        <div class="tab-panel" id="identityTab" role="tabpanel">
+          <div class="key-block">
+            <div class="key-label">
+              <strong>Identity key</strong>
+              <button class="copy-btn" id="copyIdentity">Copy</button>
+            </div>
+            <p class="key-value" id="identityKeyValue">#ghost-...-0000-E abc1234</p>
+            <p class="tab-note">A composite identity string combining your public key and private key data.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="manual-identity">
+        <p class="manual-text">Already have a Ghost identity on another device? Paste the full identity string here to register this device.</p>
+        <div class="manual-input-group">
+          <input type="text" id="manualIdentityInput" class="manual-input" placeholder="#ghost-codename-1234-E abc1234" />
+          <button class="btn btn-secondary" id="useExistingIdentity">Use Existing Identity</button>
+        </div>
+      </div>
+
+      <div class="login-actions">
+        <button class="btn btn-primary" id="continueButton">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p><span class="logo-ring logo-ring--inline" aria-hidden="true"></span>GhostTunn • Privacy-first communication platform</p>
+      <p>© 2026 <span class="logo-ring logo-ring--inline" aria-hidden="true"></span>GhostTunn</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

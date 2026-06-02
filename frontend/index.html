@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GhostTunn</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div id="splashScreen" class="screen screen--splash">
+    <div class="splash-inner">
+      <div class="logo-shell">
+        <div class="logo-mark logo-ring" aria-hidden="true"></div>
+        <div class="logo-text">GhostTunn</div>
+      </div>
+      <div class="splash-subtitle">Secure anonymous communication through the tunnel.</div>
+    </div>
+  </div>
+
+  <div id="welcomeScreen" class="screen screen--welcome hidden">
+    <div class="welcome-panel">
+      <p class="eyebrow">Welcome</p>
+      <h1>Anonymous social messaging reimagined.</h1>
+      <p><span class="logo-ring logo-ring--inline" aria-hidden="true"></span>GhostTunn launches your private identity and secure GhostTime feed without email or phone number.</p>
+      <button class="btn btn-primary" id="welcomeContinue">Continue</button>
+    </div>
+  </div>
+
+  <div id="identityScreen" class="screen screen--identity hidden">
+    <div class="identity-panel">
+      <div class="identity-header">
+        <p class="eyebrow">Identity Creation</p>
+        <h2>Create your public profile and hidden private identity.</h2>
+      </div>
+      <div class="identity-cards">
+        <div class="identity-card">
+          <h3>Public ID</h3>
+          <p id="publicIdValue">@Ghost-????-000</p>
+        </div>
+        <div class="identity-card">
+          <h3>Private ID</h3>
+          <p class="subtle">Hidden from public view. Used for internal security.</p>
+          <p id="privateIdValue">#ghost-XXX-0000-E</p>
+        </div>
+      </div>
+      <div class="avatar-select">
+        <div class="section-title">
+          <h3>Select an avatar</h3>
+          <p>Choose imagery that represents your anonymous presence.</p>
+        </div>
+        <div class="avatar-grid" id="avatarGrid"></div>
+      </div>
+      <div class="identity-actions">
+        <button class="btn btn-neon" id="saveIdentity" disabled>Start Now</button>
+        <button class="btn btn-secondary" id="identityBack">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="appShell" class="screen screen--app hidden">
+    <div class="app-header">
+      <div class="brand-block">
+        <div class="app-logo logo-ring logo-ring--small" aria-hidden="true"></div>
+        <div>
+          <p class="eyebrow">GhostTime</p>
+          <h1>Live feed and chats</h1>
+        </div>
+      </div>
+      <div class="search-block">
+        <input id="globalSearch" type="search" placeholder="Search public IDs, posts, friends..." />
+      </div>
+    </div>
+
+    <div class="app-content">
+      <section id="homeView" class="content-view">
+        <div class="home-card">
+          <div class="home-intro">
+            <div>
+              <p class="eyebrow">GhostTime Feed</p>
+              <h2>Post text-only updates and follow the flow.</h2>
+            </div>
+          </div>
+          <form id="postForm" class="post-form">
+            <textarea id="postInput" rows="4" placeholder="Share a thought for GhostTime..."></textarea>
+            <div class="post-footer">
+              <span id="charCount">0 / 280</span>
+              <button class="btn btn-primary" type="submit">Post</button>
+            </div>
+          </form>
+        </div>
+        <div id="feedList" class="feed-list"></div>
+      </section>
+
+      <section id="chatsView" class="content-view hidden">
+        <div class="section-title"><h2>Chats</h2><p>Your private message list.</p></div>
+        <div id="chatList" class="chat-list"></div>
+      </section>
+
+      <section id="idsView" class="content-view hidden">
+        <div class="section-title"><h2>ID List</h2><p>Connections, statuses, and quick chat access.</p></div>
+        <div id="idConnections" class="id-grid"></div>
+      </section>
+
+      <section id="notificationsView" class="content-view hidden">
+        <div class="section-title"><h2>Notifications</h2><p>Social, connection, and system alerts.</p></div>
+        <div id="notificationsList" class="notification-list"></div>
+      </section>
+
+      <section id="accountView" class="content-view hidden">
+        <div class="section-title"><h2>Account</h2><p>Profile settings and privacy controls.</p></div>
+        <div class="account-panel">
+          <div class="account-meta">
+            <div class="avatar-large" id="accountAvatar">👻</div>
+            <div>
+              <h3 id="accountPublicId">@Ghost-Unknown</h3>
+              <p id="accountPrivateId" class="private-id">Private ID hidden</p>
+            </div>
+          </div>
+          <div class="account-stats">
+            <div><strong>Joined</strong><span id="accountJoined">Today</span></div>
+            <div><strong>Posts</strong><span id="accountPosts">0</span></div>
+            <div><strong>Connections</strong><span id="accountConnections">0</span></div>
+          </div>
+          <div class="account-actions">
+            <button class="btn btn-secondary" id="revealPrivate">Reveal Private ID</button>
+            <button class="btn btn-secondary" id="resetIdentity">Reset Identity</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <nav class="bottom-nav">
+      <button class="nav-item nav-item--active" data-target="homeView">Home</button>
+      <button class="nav-item" data-target="chatsView">Chats</button>
+      <button class="nav-item" data-target="idsView">IDs</button>
+      <button class="nav-item" data-target="notificationsView">Alerts</button>
+      <button class="nav-item" data-target="accountView">Account</button>
+    </nav>
+  </div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>
