@@ -33,7 +33,9 @@ from utils import get_avatar_choices
 from terminal import router as terminal_router
 
 
-app = FastAPI(title=Settings.PROJECT_NAME, version="0.1.0")
+settings = Settings()
+
+app = FastAPI(title=settings.PROJECT_NAME, version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
