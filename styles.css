@@ -1265,7 +1265,7 @@ h2 {
 }
 
 .gt-comments-dropdown.hidden {
-  display: none;
+  display: flexbox;
 }
 
 .gt-comments-dropdown .gt-comments {

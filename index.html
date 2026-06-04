@@ -121,7 +121,7 @@
           <div class="stat-card key-card">
             <div class="key-label">
               <strong>Public key</strong>
-              <button class="copy-btn" id="copySecurityPublic">Copy</button>
+              <button class="copy-btn" id="copySecurityPublic">copy</button>
             </div>
             <p class="key-value" id="securityPublicKey">#ghost-A1B2-C3D4-E</p>
             <p>Shared publicly to receive messages from trusted contacts.</p>
@@ -129,26 +129,26 @@
           <div class="stat-card key-card">
             <div class="key-label">
               <strong>Private key</strong>
-              <button class="copy-btn" id="copySecurityPrivate">Copy</button>
+              <button class="copy-btn" id="copySecurityPrivate"></button>
             </div>
-            <p class="key-value" id="securityPrivateKey">PRV-7F8E-6D5C-4B3A</p>
-            <p>Kept on your device and used for secure identity verification.</p>
+            <p class="key-value" id="securityPrivateKey"></p>
+            <p>evice and used for secure identity verification.</p>
           </div>
           <div class="stat-card key-card">
             <div class="key-label">
               <strong>Identity key</strong>
-              <button class="copy-btn" id="copySecurityIdentity">Copy</button>
+              <button class="copy-btn" id="copySecurityIdentity"></button>
             </div>
-            <p class="key-value" id="securityIdentityKey">#ghost-A1B2-C3D4-E / PRV-7F8E</p>
+            <p class="key-value" id="securityIdentityKey"></p>
             <p>Used for your encrypted profile and session authentication.</p>
           </div>
           <div class="stat-card key-card">
             <div class="key-label">
               <strong>Registration key</strong>
-              <button class="copy-btn" id="copyRegistrationKey">Copy</button>
+              <button class="copy-btn" id="copyRegistrationKey"></button>
             </div>
-            <p class="key-value" id="registrationKey">REG-DEVICE-ADOPT-9F2B</p>
-            <p>Use this key when adopting a new device to register securely.</p>
+            <p class="key-value" id="registrationKey"></p>
+            <p> adopting a new device to register securely.</p>
           </div>
         </div>
       </div>
@@ -188,7 +188,7 @@
             </div>
             <div class="search-action-row">
               <div class="search-bar-container">
-                <input type="search" id="chatSearchInput" class="search-bar" placeholder="Search friends or public ID" />
+                <input type="search" id="chatSearchInput" class="search-bar" placeholder="Search eg; #ghost-codename-uniquenumber-E" />
               </div>
               <button class="btn btn-secondary add-friend-button" id="addFriendButton" type="button" title="Add friend by public ID">+</button>
             </div>
@@ -208,7 +208,7 @@
           <div class="view-panel hidden" id="ghosttimeView">
             <div class="ghosttime-panel">
               <div class="ghosttime-header">
-                <h2 class="glow-text glow">GhostTime</h2>
+                <h2 class="glow-text glow">Ghost-Diary</h2>
               </div>
               <div class="gt-post-form">
                 <textarea id="gtPostText" placeholder="Share a text post..."></textarea>
@@ -222,20 +222,20 @@
             <div class="terminal-panel">
               <div class="terminal-header">
                 <div>
-                  <p class="eyebrow">Python Console</p>
+                  <p class="eyebrow">Ghost console</p>
                   <h2><span class="logo-ring logo-ring--inline" aria-hidden="true"></span>GhostTunn shell</h2>
                 </div>
-                <span class="terminal-status">Ready</span>
+                <span class="terminal-status">Active</span>
               </div>
               <div class="terminal-output" id="terminalOutput">
-                <div class="terminal-line info">Type <strong>ghost help</strong> to explore messages, identity, privacy, files, and device commands.</div>
+                <div class="terminal-line info">@ghost<strong> is a root: </strong> explore messages, identity, privacy, files, and device commands.</div>
               </div>
               <div class="terminal-input-row">
-                <span class="terminal-prompt">python&gt;&gt;&gt;</span>
-                <input id="terminalInput" class="terminal-input" type="text" placeholder="Enter command..." autocomplete="off" />
+                <span class="terminal-prompt">ghost script</span>
+                <input id="terminalInput" class="terminal-input" type="text" placeholder="command..." autocomplete="on" />
               </div>
               <div class="terminal-actions">
-                <button class="btn btn-secondary" id="terminalClear">Clear</button>
+                <button class="btn btn-secondary" id="terminalClear">clean</button>
               </div>
             </div>
           </div>

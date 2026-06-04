@@ -464,7 +464,3 @@ function startApp() {
 }
 
 startApp();
-'''
-with open('/home/escharion/GhostTunn/tmp_script.js','w',encoding='utf-8') as f:
-    f.write(content)
-PY

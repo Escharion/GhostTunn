@@ -7,8 +7,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.config import settings
-from backend.crud import (
+from config import Settings
+from crud import (
     create_chat,
     create_identity,
     create_message,
@@ -19,8 +19,8 @@ from backend.crud import (
     get_user_by_public,
     get_user_chats,
 )
-from backend.database import Base, engine, get_session
-from backend.schemas import (
+from database import Base, engine, get_session
+from schemas import (
     ChatCreate,
     IdentityCreateResponse,
     MessageCreate,
@@ -29,11 +29,11 @@ from backend.schemas import (
     PostCreate,
     PostResponse,
 )
-from backend.utils import get_avatar_choices
-from backend.terminal import router as terminal_router
+from utils import get_avatar_choices
+from terminal import router as terminal_router
 
 
-app = FastAPI(title=settings.PROJECT_NAME, version="0.1.0")
+app = FastAPI(title=Settings.PROJECT_NAME, version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,

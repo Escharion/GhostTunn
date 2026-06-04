@@ -32,12 +32,12 @@ def parse_public_id(public_id: str) -> tuple[str, str, str]:
 
 def build_help_output() -> List[str]:
     return [
-        "Identity & Account: ghost, ghost whoami, ghost profile, ghost id, ghost publicid, ghost status, ghost logout, ghost delete-account",
-        "Contacts: ghost connect @user, ghost disconnect @user, ghost contacts, ghost block @user, ghost blocked",
-        "Messaging: ghost chat @user, ghost send @user, ghost inbox, ghost reply, ghost unread",
-        "Privacy: ghost privacy, ghost lock, ghost panic, ghost security, ghost audit",
-        "Files: ghost upload, ghost download, ghost share file, ghost files, ghost backup, ghost sync",
-        "System: ghost version, ghost update, ghost clear, ghost theme, ghost stats"
+        "IDENTITY AND ACCOUNT\n: ghost, ghost whoami, ghost profile, ghost id, ghost publicid, ghost status, ghost logout, ghost delete-account\n",
+        "CONTACTS\n: ghost connect @user, ghost disconnect @user, ghost contacts, ghost block @user, ghost blocked\n",
+        "MESSAGE\n: ghost chat @user, ghost send @user, ghost inbox, ghost reply, ghost unread\n",
+        "PRIVACY\n: ghost privacy, ghost lock, ghost panic, ghost security, ghost audit\n",
+        "FILES\n: ghost upload, ghost download, ghost share file, ghost files, ghost backup, ghost sync\n",
+        "GHOST\n: ghost version, ghost update, ghost clear, ghost theme, ghost stats\n"
     ]
 
 
@@ -101,4 +101,4 @@ async def terminal_command(request: TerminalRequest) -> TerminalResponse:
     if normalized == "ghost clear":
         return TerminalResponse(output=[], clear=True)
 
-    return TerminalResponse(output=[f"Unknown command: {command}. Type ghost help for a command list."], status="error")
+    return TerminalResponse(output=[f"Unknown command: {command}. Type ghost help for a command list."], status="")
