@@ -19,10 +19,28 @@
         <span></span>
       </button>
       <nav class="site-nav" id="siteNav">
-        <a href="#features">Features</a>
-        <a href="#architecture">Architecture</a>
-        <a href="#security">Security</a>
-        <a href="#contact">Contact</a>
+        <a href="#features" class="nav-link" data-section="features">Features</a>
+        <a href="#architecture" class="nav-link" data-section="architecture">Architecture</a>
+        <a href="#security" class="nav-link" data-section="security">Security</a>
+        <a href="#contact" class="nav-link" data-section="contact">Contact</a>
+
+        <!-- Notifications -->
+        <div class="notif-wrapper" id="notifWrapper">
+          <button class="notif-bell" id="notifBell" aria-label="Notifications" aria-expanded="false">
+            <span class="notif-icon">🔔</span>
+            <span class="notif-badge" id="notifBadge" aria-label="3 unread notifications">3</span>
+          </button>
+          <div class="notif-dropdown" id="notifDropdown" aria-hidden="true" role="dialog" aria-label="Notifications">
+            <div class="notif-header">
+              <span class="notif-title">Notifications</span>
+              <button class="notif-clear-all" id="notifClearAll">Mark all read</button>
+            </div>
+            <ul class="notif-list" id="notifList" role="list"></ul>
+            <div class="notif-footer">
+              <span class="notif-footer-text">GhostTunn — private by default</span>
+            </div>
+          </div>
+        </div>
       </nav>
     </div>
   </header>

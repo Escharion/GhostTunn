@@ -157,6 +157,23 @@ const PUBLIC_STORAGE_KEY = 'ghostPublicKey';
 const PRIVATE_STORAGE_KEY = 'ghostPrivateKey';
 const IDENTITY_STORAGE_KEY = 'ghostIdentityKey';
 
+// ─── Notification data ────────────────────────────────────────
+const notifications = [
+  { id: 'n1', icon: '🔐', text: 'Your identity key was used to start a new session.', time: '2m ago', unread: true, section: 'security' },
+  { id: 'n2', icon: '💬', text: 'Cipher Nexus sent you a new message.', time: '8m ago', unread: true, section: null },
+  { id: 'n3', icon: '📝', text: 'New post on GhostTime from Shadow Echo.', time: '20m ago', unread: true, section: null },
+  { id: 'n4', icon: '🛡️', text: 'Ghost mode is active — your location is hidden.', time: '1h ago', unread: false, section: 'security' },
+  { id: 'n5', icon: '⚡', text: 'GhostTunn relay connected successfully.', time: '2h ago', unread: false, section: 'architecture' },
+];
+
+// ─── Notification DOM refs ────────────────────────────────────
+const notifBell = document.getElementById('notifBell');
+const notifBadge = document.getElementById('notifBadge');
+const notifDropdown = document.getElementById('notifDropdown');
+const notifList = document.getElementById('notifList');
+const notifClearAll = document.getElementById('notifClearAll');
+let notifOpen = false;
+
 menuToggle?.addEventListener('click', () => {
   siteNav?.classList.toggle('active');
 });
@@ -1012,9 +1029,148 @@ avatarRemoveBtn?.addEventListener('click', () => {
 
 // Close drawer with Escape key
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && profileDrawer?.classList.contains('open')) {
-    closeProfileDrawer();
+  if (e.key === 'Escape') {
+    if (profileDrawer?.classList.contains('open')) closeProfileDrawer();
+    if (notifOpen) closeNotifDropdown();
   }
 });
 
-window.addEventListener('DOMContentLoaded', initializeApp);
+// ─── Nav links: scroll to section (even from app shell) ──────
+function navigateToSection(sectionId) {
+  // If app shell is visible, switch back to landing view first
+  const shell = document.getElementById('appShell');
+  const isShellVisible = shell && !shell.classList.contains('hidden');
+
+  if (isShellVisible) {
+    // Hide app shell, show landing sections
+    shell.classList.add('hidden');
+    document.querySelectorAll('main > section:not(#appShell)').forEach((s) => s.classList.remove('hidden'));
+    document.body.classList.remove('no-scroll');
+  }
+
+  // Scroll to target section after a short tick to let DOM settle
+  requestAnimationFrame(() => {
+    const target = document.getElementById(sectionId);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // Close mobile nav if open
+  siteNav?.classList.remove('active');
+}
+
+// Attach to all nav links
+document.querySelectorAll('.nav-link[data-section]').forEach((link) => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    navigateToSection(link.dataset.section);
+  });
+});
+
+// Logo → home
+document.querySelector('.brand')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  navigateToSection('home');
+});
+
+// ─── Notifications ────────────────────────────────────────────
+function updateBadge() {
+  const unreadCount = notifications.filter((n) => n.unread).length;
+  if (!notifBadge) return;
+  if (unreadCount > 0) {
+    notifBadge.textContent = unreadCount;
+    notifBadge.classList.remove('hidden');
+    notifBell?.setAttribute('aria-label', `Notifications — ${unreadCount} unread`);
+  } else {
+    notifBadge.classList.add('hidden');
+    notifBell?.setAttribute('aria-label', 'Notifications — all read');
+  }
+}
+
+function renderNotifications() {
+  if (!notifList) return;
+  if (notifications.length === 0) {
+    notifList.innerHTML = '<li class="notif-empty">You\'re all caught up 👻</li>';
+    return;
+  }
+  notifList.innerHTML = notifications.map((n) => `
+    <li class="notif-item${n.unread ? ' unread' : ''}" data-id="${n.id}" data-section="${n.section || ''}">
+      <div class="notif-item-icon">${n.icon}</div>
+      <div class="notif-item-body">
+        <p class="notif-item-text">${n.text}</p>
+        <span class="notif-item-time">${n.time}</span>
+      </div>
+      <span class="notif-unread-dot" aria-hidden="true"></span>
+    </li>
+  `).join('');
+
+  // Click each notification item
+  notifList.querySelectorAll('.notif-item').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.id;
+      const section = el.dataset.section;
+      const notif = notifications.find((n) => n.id === id);
+      if (notif) notif.unread = false;
+      el.classList.remove('unread');
+      el.querySelector('.notif-unread-dot')?.classList.remove('unread');
+      updateBadge();
+      closeNotifDropdown();
+      if (section) navigateToSection(section);
+    });
+  });
+}
+
+function openNotifDropdown() {
+  if (!notifDropdown) return;
+  renderNotifications();
+  notifDropdown.classList.add('open');
+  notifDropdown.setAttribute('aria-hidden', 'false');
+  notifBell?.setAttribute('aria-expanded', 'true');
+  notifOpen = true;
+}
+
+function closeNotifDropdown() {
+  if (!notifDropdown) return;
+  notifDropdown.classList.remove('open');
+  notifDropdown.setAttribute('aria-hidden', 'true');
+  notifBell?.setAttribute('aria-expanded', 'false');
+  notifOpen = false;
+}
+
+notifBell?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  notifOpen ? closeNotifDropdown() : openNotifDropdown();
+});
+
+notifClearAll?.addEventListener('click', () => {
+  notifications.forEach((n) => { n.unread = false; });
+  renderNotifications();
+  updateBadge();
+});
+
+// Close notification dropdown on outside click
+document.addEventListener('click', (e) => {
+  if (notifOpen && notifDropdown && !document.getElementById('notifWrapper')?.contains(e.target)) {
+    closeNotifDropdown();
+  }
+});
+
+// ─── Highlight active nav link on scroll ─────────────────────
+const landingSections = ['home', 'features', 'architecture', 'security', 'contact'];
+function updateActiveNavLink() {
+  const scrollY = window.scrollY + 100;
+  let current = 'home';
+  landingSections.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el && el.offsetTop <= scrollY) current = id;
+  });
+  document.querySelectorAll('.nav-link[data-section]').forEach((link) => {
+    link.classList.toggle('active', link.dataset.section === current);
+  });
+}
+window.addEventListener('scroll', updateActiveNavLink, { passive: true });
+
+window.addEventListener('DOMContentLoaded', () => {
+  updateBadge();
+  updateActiveNavLink();
+  initializeApp();
+});
