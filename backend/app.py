@@ -91,6 +91,14 @@ async def serve_script():
     raise HTTPException(status_code=404, detail="Script not found")
 
 
+@app.get("/logo.jpeg", include_in_schema=False)
+async def serve_logo():
+    logo_path = project_dir / "logo.jpeg"
+    if logo_path.exists():
+        return FileResponse(logo_path, media_type="image/jpeg")
+    raise HTTPException(status_code=404, detail="Logo not found")
+
+
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "environment": settings.ENVIRONMENT}

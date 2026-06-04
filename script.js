@@ -4,14 +4,9 @@ const demoGhostId = document.getElementById('demoGhostId');
 const ghostIdValue = document.getElementById('ghostIdValue');
 const contactForm = document.getElementById('contactForm');
 const loginOverlay = document.getElementById('loginOverlay');
-const publicKeyValue = document.getElementById('publicKeyValue');
-const privateKeyValue = document.getElementById('privateKeyValue');
 const identityKeyValue = document.getElementById('identityKeyValue');
 const continueButton = document.getElementById('continueButton');
-const copyPublic = document.getElementById('copyPublic');
-const copyPrivate = document.getElementById('copyPrivate');
 const copyIdentity = document.getElementById('copyIdentity');
-const loginTabs = document.querySelectorAll('.login-tab');
 const appShell = document.getElementById('appShell');
 const manualIdentityInput = document.getElementById('manualIdentityInput');
 const useExistingIdentityButton = document.getElementById('useExistingIdentity');
@@ -24,6 +19,7 @@ const chatView = document.getElementById('chatView');
 const ghosttimeView = document.getElementById('ghosttimeView');
 const accountView = document.getElementById('accountView');
 const chatDetailPanel = document.getElementById('chatDetailPanel');
+const messageInputArea = document.getElementById('messageInputArea');
 const searchActionRow = document.querySelector('.search-action-row');
 const appTopbar = document.querySelector('.app-topbar');
 const backToChatListButton = document.getElementById('backToChatListButton');
@@ -34,24 +30,16 @@ const messageInput = document.getElementById('messageInput');
 const sendButton = document.getElementById('sendButton');
 const appSidebar = document.querySelector('.app-sidebar');
 const sidebarIcons = document.querySelectorAll('.sidebar-icon');
+const mobileNavBtns = document.querySelectorAll('.mobile-nav-btn');
 const gtPostText = document.getElementById('gtPostText');
 const gtPostList = document.getElementById('gtPostList');
 const publishGtPostButton = document.getElementById('publishGtPost');
-const privacySettingsBtn = document.getElementById('privacySettingsBtn');
-const privacyPanel = document.getElementById('privacyPanel');
-const privacyBackBtn = document.getElementById('privacyBackBtn');
 const terminalView = document.getElementById('terminalView');
 const terminalOutput = document.getElementById('terminalOutput');
 const terminalInput = document.getElementById('terminalInput');
 const terminalClear = document.getElementById('terminalClear');
-const copySecurityPublic = document.getElementById('copySecurityPublic');
-const copySecurityPrivate = document.getElementById('copySecurityPrivate');
 const copySecurityIdentity = document.getElementById('copySecurityIdentity');
-const copyRegistrationKey = document.getElementById('copyRegistrationKey');
-const securityPublicKey = document.getElementById('securityPublicKey');
-const securityPrivateKey = document.getElementById('securityPrivateKey');
 const securityIdentityKey = document.getElementById('securityIdentityKey');
-const registrationKey = document.getElementById('registrationKey');
 
 let activeFilter = 'all';
 let activeChatId = null;
@@ -127,7 +115,6 @@ const gtComments = {
   ]
 };
 
-
 const DEVICE_STORAGE_KEY = 'ghostDeviceId';
 const PUBLIC_STORAGE_KEY = 'ghostPublicKey';
 const PRIVATE_STORAGE_KEY = 'ghostPrivateKey';
@@ -185,20 +172,12 @@ function parseManualIdentity(value) {
   const remainder = trimmed.slice(publicMatch.index + publicMatch[0].length).trim();
   const privateMatch = remainder.match(/@Ghost-[A-Za-z0-9]{7}/);
   if (privateMatch) {
-    return {
-      publicKey: publicMatch[0],
-      privateKey: privateMatch[0],
-    };
+    return { publicKey: publicMatch[0], privateKey: privateMatch[0] };
   }
-
   const rawMatch = remainder.match(/[A-Za-z0-9]{7}/);
   if (rawMatch) {
-    return {
-      publicKey: publicMatch[0],
-      privateKey: `@Ghost-${rawMatch[0]}`,
-    };
+    return { publicKey: publicMatch[0], privateKey: `@Ghost-${rawMatch[0]}` };
   }
-
   return null;
 }
 
@@ -207,24 +186,19 @@ function updateLoginKeys() {
   const privateKey = generatePrivateKey();
   const identityKey = generateIdentityKey(publicKey, privateKey);
 
-  if (publicKeyValue) publicKeyValue.textContent = publicKey;
-  if (privateKeyValue) privateKeyValue.textContent = privateKey;
   if (identityKeyValue) identityKeyValue.textContent = identityKey;
   if (ghostIdValue) ghostIdValue.textContent = `Ghost ID: ${publicKey}`;
+
+  // Store in data attributes for use by continueButton
+  if (identityKeyValue) {
+    identityKeyValue.dataset.publicKey = publicKey;
+    identityKeyValue.dataset.privateKey = privateKey;
+  }
+
+  // Update security section identity key
+  if (securityIdentityKey) securityIdentityKey.textContent = identityKey;
+
   return { publicKey, privateKey, identityKey };
-}
-
-function setActiveTab(tabName) {
-  loginTabs.forEach((tab) => {
-    const isActive = tab.dataset.tab === tabName;
-    tab.classList.toggle('active', isActive);
-    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
-  });
-
-  document.querySelectorAll('.tab-panel').forEach((panel) => {
-    const isActive = panel.id === `${tabName}Tab`;
-    panel.classList.toggle('active', isActive);
-  });
 }
 
 function generateAvatarColor(publicKey) {
@@ -254,6 +228,7 @@ function loadAppWithKeys(publicKey, privateKey) {
   if (accountPublicKey) accountPublicKey.textContent = publicKey;
   if (ghostIdValue) ghostIdValue.textContent = `Ghost ID: ${publicKey}`;
   if (identityKeyValue) identityKeyValue.textContent = identityKey;
+  if (securityIdentityKey) securityIdentityKey.textContent = identityKey;
   applyAvatar(publicKey);
 }
 
@@ -290,15 +265,14 @@ function getChatList() {
 function openChatDetail(chatId) {
   activeChatId = chatId;
   renderChatDetail();
-  
-  // Show message input for chat (remove hidden class, also remove compact class)
-  const inputArea = document.querySelector('.message-input-area');
-  if (inputArea) {
-    inputArea.classList.remove('hidden');
-    inputArea.classList.remove('compact');
+
+  if (messageInputArea) {
+    messageInputArea.classList.remove('hidden');
+    messageInputArea.classList.remove('compact');
+    messageInputArea.removeAttribute('data-mode');
   }
-  
-  if (window.innerWidth < 1200) {
+
+  if (window.innerWidth < 980) {
     chatDetailPanel?.classList.add('show');
     chatListElement?.classList.add('hidden');
   } else {
@@ -307,7 +281,7 @@ function openChatDetail(chatId) {
 }
 
 function closeChatDetail() {
-  if (window.innerWidth < 1200) {
+  if (window.innerWidth < 980) {
     chatDetailPanel?.classList.remove('show');
     chatListElement?.classList.remove('hidden');
   } else {
@@ -322,7 +296,7 @@ function renderChatList() {
     chatListElement.innerHTML = '<div class="chat-empty">No chats or requests match your search.</div>';
     return;
   }
-  
+
   chatListElement.innerHTML = filteredChats
     .map((chat) => {
       const activeClass = chat.id === activeChatId ? ' active' : '';
@@ -344,13 +318,13 @@ function renderChatList() {
       `;
     })
     .join('');
-  
+
   chatListElement.querySelectorAll('.chat-item').forEach((item) => {
     item.addEventListener('click', () => {
       openChatDetail(item.dataset.chatId);
     });
   });
-  
+
   if (!activeChatId && filteredChats.length > 0) {
     activeChatId = filteredChats[0].id;
     renderChatDetail();
@@ -366,11 +340,11 @@ function renderChatDetail() {
     messagesContainer.innerHTML = '<div class="chat-empty">Choose a chat from the left or add a friend to start.</div>';
     return;
   }
-  
+
   chatDetailTitle.textContent = chat.name;
   chatDetailSubtitle.textContent = chat.publicKey;
   chat.unread = 0;
-  
+
   messagesContainer.innerHTML = chat.messages
     .map((message) => {
       const direction = message.sender === 'me' ? 'outgoing' : 'incoming';
@@ -384,7 +358,7 @@ function renderChatDetail() {
       `;
     })
     .join('');
-  
+
   renderChatList();
 }
 
@@ -393,28 +367,32 @@ function switchAppView(view) {
   if (ghosttimeView) ghosttimeView.classList.toggle('hidden', view !== 'ghosttime');
   if (terminalView) terminalView.classList.toggle('hidden', view !== 'terminal');
   if (accountView) accountView.classList.toggle('hidden', view !== 'account');
-  
+
   sidebarIcons.forEach((icon) => {
-    const isActive = icon.dataset.view === view;
-    icon.classList.toggle('active', isActive);
+    icon.classList.toggle('active', icon.dataset.view === view);
   });
-  
+
+  mobileNavBtns.forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.view === view);
+  });
+
   if (view === 'ghosttime') {
     renderGtPosts();
+    // Close any open detail panel so we see the feed
+    if (chatDetailPanel) chatDetailPanel.classList.add('hidden');
+    chatDetailPanel?.classList.remove('show');
   }
-  // Only show search / add friend controls when in the chat view
-  if (searchActionRow) {
-    searchActionRow.classList.toggle('hidden', view !== 'chat');
-  }
-  if (addFriendButton) {
-    addFriendButton.classList.toggle('hidden', view !== 'chat');
-  }
-  if (appTopbar) {
-    appTopbar.classList.toggle('hidden', view !== 'chat');
-  }
+
+  if (searchActionRow) searchActionRow.classList.toggle('hidden', view !== 'chat');
+  if (addFriendButton) addFriendButton.classList.toggle('hidden', view !== 'chat');
+  if (appTopbar) appTopbar.classList.toggle('hidden', view !== 'chat');
+
   if (view === 'terminal' && terminalInput) {
     terminalInput.focus();
   }
+
+  // Hide the message input when switching views
+  if (messageInputArea) messageInputArea.classList.add('hidden');
 }
 
 function renderGtPosts() {
@@ -436,14 +414,12 @@ function renderGtPosts() {
   gtPostList.querySelectorAll('.view-post-button').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const id = btn.dataset.postId;
-      openGtPostDetail(id);
+      openGtPostDetail(btn.dataset.postId);
     });
   });
   gtPostList.querySelectorAll('.gt-post-card').forEach((card) => {
     card.addEventListener('click', () => {
-      const id = card.dataset.postId;
-      openGtPostDetail(id);
+      openGtPostDetail(card.dataset.postId);
     });
   });
 }
@@ -468,7 +444,7 @@ function openGtPostDetail(postId) {
   post.views = (post.views || 0) + 1;
 
   if (chatDetailTitle) chatDetailTitle.textContent = post.publisher;
-  if (chatDetailSubtitle) chatDetailSubtitle.textContent = 'Posts';
+  if (chatDetailSubtitle) chatDetailSubtitle.textContent = 'GhostTime';
 
   const publisherPosts = gtPosts.filter(p => p.publisherId === post.publisherId && p.id !== post.id);
 
@@ -499,13 +475,11 @@ function openGtPostDetail(postId) {
     `;
 
     if (chatDetailPanel) chatDetailPanel.classList.remove('hidden');
-    
-    // Hide message input by default, show compact style when needed
-    if (messageInput) messageInput.placeholder = 'Add a comment...';
-    if (document.querySelector('.message-input-area')) {
-      document.querySelector('.message-input-area').classList.add('hidden');
-    }
-    
+    if (window.innerWidth < 980) chatDetailPanel?.classList.add('show');
+
+    // Never show the outer message input area on GhostTime posts — comments are inline
+    if (messageInputArea) messageInputArea.classList.add('hidden');
+
     renderComments(post.id);
 
     const buttons = messagesContainer.querySelectorAll('.gt-stat-button');
@@ -518,42 +492,27 @@ function openGtPostDetail(postId) {
         }
         if (action === 'comments') {
           const dropdown = document.getElementById(`gtCommentsDropdown-${postId}`);
-          const inputArea = document.querySelector('.message-input-area');
-          if (dropdown) {
-            dropdown.classList.toggle('hidden');
-          }
-          if (inputArea) {
-            inputArea.classList.toggle('hidden');
-            inputArea.classList.add('compact');
-            if (!inputArea.classList.contains('hidden')) {
-              messageInput?.focus();
-              messageInput?.setAttribute('data-post-id', postId);
-            }
-          }
+          if (dropdown) dropdown.classList.toggle('hidden');
         }
       });
     });
 
-    // Wire comment send button inside dropdown
     const commentSendBtn = messagesContainer.querySelector(`.gt-comment-send[data-post-id="${postId}"]`);
     const commentInput = messagesContainer.querySelector(`.gt-comment-input[data-post-id="${postId}"]`);
     if (commentSendBtn && commentInput) {
-      commentSendBtn.addEventListener('click', () => {
+      const sendComment = () => {
         const text = commentInput.value.trim();
         if (!text) return;
         gtComments[postId] = gtComments[postId] || [];
         gtComments[postId].push({ author: 'You', text, time: 'Just now' });
         commentInput.value = '';
         renderComments(postId);
-        // update comment count
         const commentsBtn = messagesContainer.querySelector(`.gt-stat-button[data-action="comments"]`);
         if (commentsBtn) commentsBtn.innerHTML = `💬 ${(gtComments[postId] || []).length}`;
-      });
+      };
+      commentSendBtn.addEventListener('click', sendComment);
       commentInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          commentSendBtn.click();
-        }
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment(); }
       });
     }
 
@@ -562,12 +521,21 @@ function openGtPostDetail(postId) {
   }
 }
 
-
 function handlePublishGtPost() {
   if (!gtPostText) return;
   const content = gtPostText.value.trim();
   if (!content) return;
-  gtPosts.unshift({ id: `post-${Date.now()}`, content, time: 'Just now' });
+  const storedPublicKey = localStorage.getItem(PUBLIC_STORAGE_KEY) || '';
+  const alias = storedPublicKey ? storedPublicKey.replace(/#ghost-/, '').split('-')[0] : 'You';
+  gtPosts.unshift({
+    id: `post-${Date.now()}`,
+    publisher: alias || 'You',
+    publisherId: 'publisher-me',
+    content,
+    time: 'Just now',
+    views: 0,
+    likes: 0
+  });
   gtPostText.value = '';
   renderGtPosts();
 }
@@ -600,22 +568,6 @@ function handleSendMessage() {
   if (!messageInput) return;
   const text = messageInput.value.trim();
   if (!text) return;
-  
-  // Check if this is a comment on a GT post
-  const postId = messageInput.getAttribute('data-post-id');
-  if (postId) {
-    gtComments[postId] = gtComments[postId] || [];
-    gtComments[postId].push({ author: 'You', text, time: 'Just now' });
-    messageInput.value = '';
-    renderComments(postId);
-    // update comment count
-    const commentsBtn = document.querySelector(`.gt-stat-button[data-action="comments"]`);
-    if (commentsBtn) commentsBtn.innerHTML = `💬 ${(gtComments[postId] || []).length}`;
-    messageInput.removeAttribute('data-post-id');
-    return;
-  }
-  
-  // Otherwise handle as chat message
   if (!activeChatId) return;
   const chat = chatData.find((item) => item.id === activeChatId);
   if (!chat) return;
@@ -640,17 +592,11 @@ function initializeApp() {
 }
 
 function showLoginOverlay() {
-  console.log('showLoginOverlay called, loginOverlay:', loginOverlay);
-  if (!loginOverlay) {
-    console.error('loginOverlay element not found');
-    return;
-  }
+  if (!loginOverlay) return;
   updateLoginKeys();
-  setActiveTab('public');
   loginOverlay.classList.add('active');
   loginOverlay.setAttribute('aria-hidden', 'false');
   document.body.classList.add('no-scroll');
-  console.log('Login overlay shown');
 }
 
 function handleManualIdentity() {
@@ -662,8 +608,6 @@ function handleManualIdentity() {
   }
   const { publicKey, privateKey } = parsed;
   const identityKey = generateIdentityKey(publicKey, privateKey);
-  if (publicKeyValue) publicKeyValue.textContent = publicKey;
-  if (privateKeyValue) privateKeyValue.textContent = privateKey;
   if (identityKeyValue) identityKeyValue.textContent = identityKey;
   saveIdentityToStorage(publicKey, privateKey, identityKey);
   loadAppWithKeys(publicKey, privateKey);
@@ -675,7 +619,6 @@ function copyText(text) {
     alert('Clipboard API is unavailable in this browser.');
     return;
   }
-
   navigator.clipboard.writeText(text).then(() => {
     alert('Copied to clipboard!');
   }).catch(() => {
@@ -687,39 +630,9 @@ if (demoGhostId) {
   demoGhostId.addEventListener('click', showLoginOverlay);
 }
 
-loginTabs.forEach((tab) => {
-  tab.addEventListener('click', () => {
-    setActiveTab(tab.dataset.tab);
-  });
-});
-
-if (copyPublic) {
-  copyPublic.addEventListener('click', () => {
-    if (publicKeyValue) copyText(publicKeyValue.textContent || '');
-  });
-}
-
-if (copyPrivate) {
-  copyPrivate.addEventListener('click', () => {
-    if (privateKeyValue) copyText(privateKeyValue.textContent || '');
-  });
-}
-
 if (copyIdentity) {
   copyIdentity.addEventListener('click', () => {
     if (identityKeyValue) copyText(identityKeyValue.textContent || '');
-  });
-}
-
-if (copySecurityPublic) {
-  copySecurityPublic.addEventListener('click', () => {
-    if (securityPublicKey) copyText(securityPublicKey.textContent || '');
-  });
-}
-
-if (copySecurityPrivate) {
-  copySecurityPrivate.addEventListener('click', () => {
-    if (securityPrivateKey) copyText(securityPrivateKey.textContent || '');
   });
 }
 
@@ -729,22 +642,20 @@ if (copySecurityIdentity) {
   });
 }
 
-if (copyRegistrationKey) {
-  copyRegistrationKey.addEventListener('click', () => {
-    if (registrationKey) copyText(registrationKey.textContent || '');
-  });
-}
-
 if (continueButton) {
   continueButton.addEventListener('click', () => {
-    if (!publicKeyValue || !privateKeyValue) return;
-    const publicKey = publicKeyValue.textContent.trim();
-    const privateKey = privateKeyValue.textContent.trim();
-    if (!publicKey || !privateKey) {
-      alert('No keys are available yet. Please generate or paste your identity before continuing.');
+    if (!identityKeyValue) return;
+    const identityKey = identityKeyValue.textContent.trim();
+    if (!identityKey || identityKey.includes('...')) {
+      alert('No identity key generated yet. Please wait a moment.');
       return;
     }
-    const identityKey = generateIdentityKey(publicKey, privateKey);
+    const publicKey = identityKeyValue.dataset.publicKey || '';
+    const privateKey = identityKeyValue.dataset.privateKey || '';
+    if (!publicKey || !privateKey) {
+      alert('Identity generation error. Please refresh and try again.');
+      return;
+    }
     saveIdentityToStorage(publicKey, privateKey, identityKey);
     loadAppWithKeys(publicKey, privateKey);
     showAppScreen();
@@ -791,27 +702,18 @@ sidebarIcons.forEach((icon) => {
   });
 });
 
+mobileNavBtns.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    switchAppView(btn.dataset.view);
+  });
+});
+
 if (backToChatListButton) {
   backToChatListButton.addEventListener('click', closeChatDetail);
 }
 
 if (publishGtPostButton) {
   publishGtPostButton.addEventListener('click', handlePublishGtPost);
-}
-
-if (privacySettingsBtn) {
-  privacySettingsBtn.addEventListener('click', () => {
-    if (privacyPanel) {
-      privacyPanel.classList.remove('hidden');
-      setupPrivacyToggles();
-    }
-  });
-}
-
-if (privacyBackBtn) {
-  privacyBackBtn.addEventListener('click', () => {
-    if (privacyPanel) privacyPanel.classList.add('hidden');
-  });
 }
 
 if (terminalClear) {
@@ -826,9 +728,9 @@ if (terminalInput) {
       e.preventDefault();
       const command = terminalInput.value.trim();
       if (!command || !terminalOutput) return;
-      appendTerminalLine(`>>> ${command}`, 'command');
-      await runTerminalCommand(command);
+      appendTerminalLine(`ghost ▶ ${command}`, 'command');
       terminalInput.value = '';
+      await runTerminalCommand(command);
     }
   });
 }
@@ -847,47 +749,37 @@ function appendTerminalLines(lines) {
 }
 
 async function runTerminalCommand(command) {
-  const publicId = (publicKeyValue?.textContent || accountPublicKey?.textContent || '').trim();
-  const payload = {
-    command,
-    public_id: publicId || undefined,
-  };
+  const publicId = localStorage.getItem(PUBLIC_STORAGE_KEY) || '';
+  const payload = { command, public_id: publicId || undefined };
 
   try {
     const response = await fetch('/api/terminal', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
-      throw new Error(`Terminal service error ${response.status}`);
+      throw new Error(`Terminal error: ${response.status}`);
     }
 
     const data = await response.json();
     if (data.clear && terminalOutput) {
       terminalOutput.innerHTML = '';
+      return;
     }
 
     if (Array.isArray(data.output) && data.output.length > 0) {
       appendTerminalLines(data.output);
     } else if (data.status === 'error') {
-      appendTerminalLine('Command failed: see backend response.', 'error');
+      appendTerminalLine('  Command failed.', 'error');
     }
   } catch (error) {
-    appendTerminalLine(`Error: ${error.message}`, 'error');
+    appendTerminalLine(`  Error: ${error.message}`, 'error');
   }
-}
 
-function setupPrivacyToggles() {
-  const toggleSwitches = document.querySelectorAll('.toggle-switch');
-  toggleSwitches.forEach((toggle) => {
-    toggle.addEventListener('click', () => {
-      toggle.classList.toggle('active');
-    });
-  });
+  // Add a blank line after each command response for readability
+  appendTerminalLine('', 'output');
 }
 
 contactForm?.addEventListener('submit', (event) => {
