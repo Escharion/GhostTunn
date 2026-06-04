@@ -156,7 +156,10 @@
           </div>
           <div class="sidebar-bottom">
             <button class="sidebar-avatar-btn" id="sidebarProfileBtn" aria-label="Profile & Settings" title="Profile & Settings">
-              <div class="avatar-circle" id="sidebarAvatar"><span class="avatar-initials" id="sidebarAvatarInitials">GH</span></div>
+              <div class="avatar-circle" id="sidebarAvatar">
+                <span class="avatar-initials" id="sidebarAvatarInitials">GH</span>
+                <img class="avatar-photo hidden" id="sidebarPhoto" alt="" aria-hidden="true" />
+              </div>
             </button>
           </div>
         </nav>
@@ -166,7 +169,10 @@
             <div class="app-topbar">
               <h1 class="app-title glow"></h1>
               <button class="topbar-profile-btn" id="topbarProfileBtn" aria-label="Profile & Settings">
-                <div class="avatar-circle avatar-circle--sm" id="topbarAvatar"><span class="avatar-initials" id="topbarAvatarInitials">GH</span></div>
+                <div class="avatar-circle avatar-circle--sm" id="topbarAvatar">
+                  <span class="avatar-initials" id="topbarAvatarInitials">GH</span>
+                  <img class="avatar-photo hidden" id="topbarPhoto" alt="" aria-hidden="true" />
+                </div>
               </button>
             </div>
             <div class="search-action-row">
@@ -257,7 +263,10 @@
         </button>
         <button class="mobile-nav-btn" id="mobileProfileBtn" aria-label="Profile">
           <span class="mobile-nav-icon">
-            <div class="avatar-circle avatar-circle--xs" id="mobileNavAvatar"><span class="avatar-initials" id="mobileNavAvatarInitials">GH</span></div>
+            <div class="avatar-circle avatar-circle--xs" id="mobileNavAvatar">
+              <span class="avatar-initials" id="mobileNavAvatarInitials">GH</span>
+              <img class="avatar-photo hidden" id="mobileNavPhoto" alt="" aria-hidden="true" />
+            </div>
           </span>
           <span class="mobile-nav-label">Profile</span>
         </button>
@@ -274,12 +283,21 @@
         <div class="profile-drawer-body">
           <!-- Avatar card -->
           <div class="profile-avatar-card">
-            <div class="avatar-circle avatar-circle--lg" id="profileDrawerAvatar">
-              <span class="avatar-initials" id="profileDrawerAvatarInitials">GH</span>
+            <div class="profile-avatar-upload-wrap">
+              <div class="avatar-circle avatar-circle--lg" id="profileDrawerAvatar">
+                <span class="avatar-initials" id="profileDrawerAvatarInitials">GH</span>
+                <img class="avatar-photo hidden" id="profileDrawerPhoto" alt="Profile photo" />
+              </div>
+              <button class="avatar-upload-btn" id="avatarUploadBtn" title="Upload photo" aria-label="Upload profile photo">
+                <span>📷</span>
+              </button>
+              <button class="avatar-remove-btn hidden" id="avatarRemoveBtn" title="Remove photo" aria-label="Remove profile photo">✕</button>
+              <input type="file" id="avatarFileInput" accept="image/*" class="hidden" aria-label="Choose profile photo" />
             </div>
             <div class="profile-alias-block">
               <p class="profile-alias" id="profileDisplayAlias">Ghost User</p>
               <p class="profile-alias-sub" id="profilePublicKeyDisplay">#ghost-…</p>
+              <p class="avatar-upload-hint" id="avatarUploadHint">Tap 📷 to set a photo</p>
             </div>
           </div>
 

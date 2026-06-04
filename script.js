@@ -57,14 +57,26 @@ const profileLogoutBtn = document.getElementById('profileLogoutBtn');
 // All avatar elements
 const sidebarAvatar = document.getElementById('sidebarAvatar');
 const sidebarAvatarInitials = document.getElementById('sidebarAvatarInitials');
+const sidebarPhoto = document.getElementById('sidebarPhoto');
 const topbarAvatar = document.getElementById('topbarAvatar');
 const topbarAvatarInitials = document.getElementById('topbarAvatarInitials');
+const topbarPhoto = document.getElementById('topbarPhoto');
 const mobileNavAvatar = document.getElementById('mobileNavAvatar');
 const mobileNavAvatarInitials = document.getElementById('mobileNavAvatarInitials');
+const mobileNavPhoto = document.getElementById('mobileNavPhoto');
 const profileDrawerAvatar = document.getElementById('profileDrawerAvatar');
 const profileDrawerAvatarInitials = document.getElementById('profileDrawerAvatarInitials');
+const profileDrawerPhoto = document.getElementById('profileDrawerPhoto');
+
+// Upload controls
+const avatarUploadBtn = document.getElementById('avatarUploadBtn');
+const avatarRemoveBtn = document.getElementById('avatarRemoveBtn');
+const avatarFileInput = document.getElementById('avatarFileInput');
+const avatarUploadHint = document.getElementById('avatarUploadHint');
 
 let profileKeyRevealed = false;
+
+const AVATAR_PHOTO_KEY = 'ghostAvatarPhoto';
 
 let activeFilter = 'all';
 let activeChatId = null;
@@ -248,17 +260,61 @@ function getAvatarInitials(publicKey) {
   return alias.slice(0, 2).toUpperCase();
 }
 
+function applyPhotoToAllAvatars(dataUrl) {
+  const photoEls = [sidebarPhoto, topbarPhoto, mobileNavPhoto, profileDrawerPhoto];
+  const initialsEls = [sidebarAvatarInitials, topbarAvatarInitials, mobileNavAvatarInitials, profileDrawerAvatarInitials];
+
+  photoEls.forEach((img) => {
+    if (!img) return;
+    img.src = dataUrl;
+    img.classList.remove('hidden');
+  });
+  initialsEls.forEach((el) => { if (el) el.classList.add('hidden'); });
+
+  // Show remove button, hide hint
+  if (avatarRemoveBtn) avatarRemoveBtn.classList.remove('hidden');
+  if (avatarUploadHint) avatarUploadHint.textContent = 'Tap 📷 to change · ✕ to remove';
+}
+
+function clearPhotoFromAllAvatars() {
+  const photoEls = [sidebarPhoto, topbarPhoto, mobileNavPhoto, profileDrawerPhoto];
+  const initialsEls = [sidebarAvatarInitials, topbarAvatarInitials, mobileNavAvatarInitials, profileDrawerAvatarInitials];
+
+  photoEls.forEach((img) => {
+    if (!img) return;
+    img.src = '';
+    img.classList.add('hidden');
+  });
+  initialsEls.forEach((el) => { if (el) el.classList.remove('hidden'); });
+
+  if (avatarRemoveBtn) avatarRemoveBtn.classList.add('hidden');
+  if (avatarUploadHint) avatarUploadHint.textContent = 'Tap 📷 to set a photo';
+}
+
 function applyAvatar(publicKey) {
   const gradient = generateAvatarColor(publicKey);
   const initials = getAvatarInitials(publicKey);
   const alias = extractAliasFromKey(publicKey);
 
-  // Apply to all avatar circles
+  // Apply gradient + initials to all circles
   const circles = [sidebarAvatar, topbarAvatar, mobileNavAvatar, profileDrawerAvatar];
   const initialsEls = [sidebarAvatarInitials, topbarAvatarInitials, mobileNavAvatarInitials, profileDrawerAvatarInitials];
 
   circles.forEach((el) => { if (el) el.style.background = gradient; });
-  initialsEls.forEach((el) => { if (el) el.textContent = initials; });
+  initialsEls.forEach((el) => {
+    if (el) {
+      el.textContent = initials;
+      el.classList.remove('hidden');
+    }
+  });
+
+  // If a saved photo exists, layer it on top of the gradient
+  const savedPhoto = localStorage.getItem(AVATAR_PHOTO_KEY);
+  if (savedPhoto) {
+    applyPhotoToAllAvatars(savedPhoto);
+  } else {
+    clearPhotoFromAllAvatars();
+  }
 
   // Update profile drawer info
   if (profileDisplayAlias) profileDisplayAlias.textContent = alias;
@@ -268,6 +324,28 @@ function applyAvatar(publicKey) {
   profileKeyRevealed = false;
   if (profileIdentityDisplay) profileIdentityDisplay.textContent = '••••••••••••••••••••';
   if (profileIdentityDisplay) profileIdentityDisplay.classList.remove('revealed');
+}
+
+function resizeAndStorePhoto(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      // Resize to max 256×256 to keep localStorage size small
+      const MAX = 256;
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      localStorage.setItem(AVATAR_PHOTO_KEY, dataUrl);
+      applyPhotoToAllAvatars(dataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function saveIdentityToStorage(publicKey, privateKey, identityKey) {
@@ -905,8 +983,31 @@ profileLogoutBtn?.addEventListener('click', () => {
   localStorage.removeItem(PUBLIC_STORAGE_KEY);
   localStorage.removeItem(PRIVATE_STORAGE_KEY);
   localStorage.removeItem(IDENTITY_STORAGE_KEY);
+  localStorage.removeItem(AVATAR_PHOTO_KEY);
   closeProfileDrawer();
   location.reload();
+});
+
+// ─── Avatar upload / remove ───────────────────────────────────
+avatarUploadBtn?.addEventListener('click', () => {
+  avatarFileInput?.click();
+});
+
+avatarFileInput?.addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    alert('Please choose an image file (JPG, PNG, GIF, WebP…).');
+    return;
+  }
+  resizeAndStorePhoto(file);
+  // Reset input so the same file can be re-selected if needed
+  avatarFileInput.value = '';
+});
+
+avatarRemoveBtn?.addEventListener('click', () => {
+  localStorage.removeItem(AVATAR_PHOTO_KEY);
+  clearPhotoFromAllAvatars();
 });
 
 // Close drawer with Escape key
