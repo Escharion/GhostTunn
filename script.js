@@ -869,20 +869,37 @@ if (publishGtPostButton) {
 if (terminalClear) {
   terminalClear.addEventListener('click', () => {
     if (terminalOutput) terminalOutput.innerHTML = '';
+    terminalRootAuthenticated = false;
+    terminalAwaitingAlias = false;
+    terminalPendingCmd = null;
+    setBldMode(false);
+    if (terminalInput) {
+      terminalInput.type = 'text';
+      terminalInput.placeholder = 'ghost help';
+    }
   });
 }
 
-if (terminalInput) {
-  terminalInput.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const command = terminalInput.value.trim();
-      if (!command || !terminalOutput) return;
-      appendTerminalLine(`ghost ▶ ${command}`, 'command');
-      terminalInput.value = '';
-      await runTerminalCommand(command);
-    }
+const bldExitBtn = document.getElementById('bldExitBtn');
+if (bldExitBtn) {
+  bldExitBtn.addEventListener('click', () => {
+    setBldMode(false);
+    appendTerminalLine('  BLD MODE deactivated via exit button.', 'output');
+    appendTerminalLine('', 'output');
   });
+}
+
+// ─── Terminal root-mode state ─────────────────────────────────
+let terminalRootAuthenticated = false;
+let terminalAwaitingAlias = false;
+let terminalPendingCmd = null;
+let terminalBldMode = false;
+let terminalLastRecipient = null;
+
+function maskPrivateKey(pk) {
+  if (!pk) return '@Ghost-●●●●●●●';
+  const raw = pk.replace('@Ghost-', '');
+  return `@Ghost-●●●${raw.slice(-3)}`;
 }
 
 function appendTerminalLine(text, type = 'output') {
@@ -898,37 +915,225 @@ function appendTerminalLines(lines) {
   lines.forEach((line) => appendTerminalLine(line, 'output'));
 }
 
-async function runTerminalCommand(command) {
-  const publicId = localStorage.getItem(PUBLIC_STORAGE_KEY) || '';
-  const payload = { command, public_id: publicId || undefined };
+function appendTerminalMessage(direction, senderLabel, senderKey, text, time) {
+  if (!terminalOutput) return;
+  const div = document.createElement('div');
+  div.className = `terminal-msg terminal-msg-${direction}`;
+  div.innerHTML = `
+    <div class="terminal-msg-meta">
+      <span class="tmsg-label">${direction === 'sent' ? '▶ YOU' : '◀ ' + senderLabel}</span>
+      <span class="tmsg-key">${senderKey}</span>
+      <span class="tmsg-time">${time}</span>
+    </div>
+    <div class="terminal-msg-body">${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+  `;
+  terminalOutput.appendChild(div);
+  terminalOutput.scrollTop = terminalOutput.scrollHeight;
+  // Simulate incoming reply after 2s
+  if (direction === 'sent') {
+    setTimeout(() => {
+      const replies = [
+        'Message received. Standing by.',
+        'Copy that. Relay confirmed.',
+        'Acknowledged. Ghost channel secure.',
+        'Got it. Stay dark.',
+        'Confirmed. Thread encrypted.',
+      ];
+      const reply = replies[Math.floor(Math.random() * replies.length)];
+      const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      appendTerminalMessage('recv', senderLabel, terminalLastRecipient || '#ghost-●●●●-E', reply, t);
+    }, 1800 + Math.random() * 1200);
+  }
+}
 
+function setBldMode(on) {
+  terminalBldMode = on;
+  const termPanel = document.querySelector('.terminal-panel');
+  const bldBanner = document.getElementById('bldBanner');
+  const bldExitBtn = document.getElementById('bldExitBtn');
+  if (on) {
+    document.body.classList.add('terminal-bld-active');
+    if (bldBanner) bldBanner.classList.remove('hidden');
+    if (bldExitBtn) bldExitBtn.classList.remove('hidden');
+    // Also switch to terminal view
+    switchAppView('terminal');
+    appendTerminalLine('', 'output');
+    appendTerminalLine('  ■ BLD terminal is now fullscreen. Type @ghost bld exit to leave.', 'root');
+  } else {
+    document.body.classList.remove('terminal-bld-active');
+    if (bldBanner) bldBanner.classList.add('hidden');
+    if (bldExitBtn) bldExitBtn.classList.add('hidden');
+  }
+}
+
+function initiateRootAuth(cmd) {
+  terminalAwaitingAlias = true;
+  terminalPendingCmd = cmd;
+  if (terminalInput) {
+    terminalInput.type = 'password';
+    terminalInput.placeholder = 'enter your alias…';
+  }
+  appendTerminalLine('', 'output');
+  appendTerminalLine('  ⚡ ROOT REQUIRED — @ghost command detected', 'warn');
+  appendTerminalLine('  Enter your alias (codename) to authenticate:', 'output');
+  appendTerminalLine('  Tip: your alias is the codename in your Ghost ID.', 'output');
+}
+
+function verifyRootAlias(input) {
+  if (terminalInput) {
+    terminalInput.type = 'text';
+    terminalInput.placeholder = '@ghost help';
+  }
+  terminalAwaitingAlias = false;
+
+  const storedPub = localStorage.getItem(PUBLIC_STORAGE_KEY) || '';
+  const deviceAlias = extractAliasFromKey(storedPub).toLowerCase();
+  const entered = input.trim().toLowerCase();
+
+  appendTerminalLine(`  ● ${entered.replace(/./g, '●')}`, 'command');
+  appendTerminalLine('', 'output');
+
+  if (!deviceAlias || deviceAlias === 'ghost') {
+    appendTerminalLine('  ✗ No identity found on device. Log in first.', 'error');
+    terminalPendingCmd = null;
+    return;
+  }
+
+  if (entered === deviceAlias) {
+    terminalRootAuthenticated = true;
+    appendTerminalLine(`  ✓ Root access granted — ${deviceAlias} authenticated.`, 'success');
+    appendTerminalLine('  @ghost commands active for this session.', 'output');
+    appendTerminalLine('', 'output');
+    const cmd = terminalPendingCmd;
+    terminalPendingCmd = null;
+    dispatchAtGhostCommand(cmd);
+  } else {
+    appendTerminalLine('  ✗ ACCESS DENIED — alias mismatch.', 'error');
+    appendTerminalLine('  Authentication failed. Use ghost commands for standard mode.', 'output');
+    terminalPendingCmd = null;
+  }
+}
+
+async function dispatchAtGhostCommand(raw) {
+  const storedPriv = localStorage.getItem(PRIVATE_STORAGE_KEY) || '';
+  const maskedKey = maskPrivateKey(storedPriv);
+  const publicId = localStorage.getItem(PUBLIC_STORAGE_KEY) || '';
+
+  // ── BLD exit (frontend-only) ───────────────────────────────
+  const cmdLow = raw.toLowerCase();
+  if (cmdLow.includes('bld exit') || cmdLow === '@ghost exit') {
+    setBldMode(false);
+    appendTerminalLine('  BLD MODE deactivated. Terminal restored.', 'output');
+    appendTerminalLine('', 'output');
+    return;
+  }
+
+  const data = await callTerminalApi(raw, publicId);
+  if (!data) return;
+
+  // Handle special statuses
+  if (data.status === 'bld_active') {
+    appendTerminalLines(data.output);
+    appendTerminalLine('', 'output');
+    setBldMode(true);
+    return;
+  }
+
+  if (data.status === 'bld_exit') {
+    setBldMode(false);
+    appendTerminalLines(data.output);
+    appendTerminalLine('', 'output');
+    return;
+  }
+
+  if (data.status === 'send_msg') {
+    // Print the thread header lines first
+    if (data.output && data.output.length > 0) appendTerminalLines(data.output);
+    // Then render the actual chat message bubble
+    const ex = data.extra || {};
+    const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    terminalLastRecipient = ex.target || '';
+    appendTerminalMessage('sent', ex.target_alias || 'Unknown', maskedKey, ex.text || '', ts);
+    appendTerminalLine('', 'output');
+    return;
+  }
+
+  if (Array.isArray(data.output) && data.output.length > 0) appendTerminalLines(data.output);
+  appendTerminalLine('', 'output');
+}
+
+async function callTerminalApi(command, publicId) {
   try {
     const response = await fetch('/api/terminal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ command, public_id: publicId || undefined }),
     });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (err) {
+    appendTerminalLine(`  Error: ${err.message}`, 'error');
+    return null;
+  }
+}
 
-    if (!response.ok) {
-      throw new Error(`Terminal error: ${response.status}`);
-    }
+if (terminalInput) {
+  terminalInput.addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const raw = terminalInput.value.trim();
+    if (!raw || !terminalOutput) return;
+    terminalInput.value = '';
 
-    const data = await response.json();
-    if (data.clear && terminalOutput) {
-      terminalOutput.innerHTML = '';
+    // ── Alias verification step ────────────────────────────
+    if (terminalAwaitingAlias) {
+      verifyRootAlias(raw);
       return;
     }
 
-    if (Array.isArray(data.output) && data.output.length > 0) {
-      appendTerminalLines(data.output);
-    } else if (data.status === 'error') {
-      appendTerminalLine('  Command failed.', 'error');
+    const isRoot = raw.startsWith('@ghost');
+
+    // Echo command (mask alias input, show @ghost prompt differently)
+    if (isRoot) {
+      appendTerminalLine(`@ghost ▶ ${raw.slice(6).trim()}`, 'root-cmd');
+    } else {
+      appendTerminalLine(`ghost ▶ ${raw}`, 'command');
     }
-  } catch (error) {
-    appendTerminalLine(`  Error: ${error.message}`, 'error');
+
+    if (isRoot) {
+      // Root command — require auth first
+      if (!terminalRootAuthenticated) {
+        initiateRootAuth(raw);
+      } else {
+        await dispatchAtGhostCommand(raw);
+      }
+      return;
+    }
+
+    // Standard ghost command → backend
+    await runTerminalCommand(raw);
+  });
+}
+
+async function runTerminalCommand(command) {
+  const publicId = localStorage.getItem(PUBLIC_STORAGE_KEY) || '';
+  const data = await callTerminalApi(command, publicId);
+  if (!data) return;
+
+  if (data.clear && terminalOutput) {
+    terminalOutput.innerHTML = '';
+    terminalRootAuthenticated = false;
+    terminalBldMode = false;
+    setBldMode(false);
+    return;
   }
 
-  // Add a blank line after each command response for readability
+  if (Array.isArray(data.output) && data.output.length > 0) {
+    appendTerminalLines(data.output);
+  } else if (data.status === 'error') {
+    appendTerminalLine('  Command failed.', 'error');
+  }
+
   appendTerminalLine('', 'output');
 }
 

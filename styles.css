@@ -2245,12 +2245,185 @@ body {
   color: #fff;
 }
 
+.terminal-line.root-cmd {
+  color: #f0a0ff;
+  font-weight: 700;
+}
+
 .terminal-line.error {
   color: #ff8e8e;
 }
 
 .terminal-line.info {
   color: #b8f8ff;
+}
+
+.terminal-line.warn {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.terminal-line.success {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.terminal-line.root {
+  color: #c084fc;
+}
+
+/* ─── BLD banner ────────────────────────────────────── */
+.bld-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: linear-gradient(90deg, rgba(168,85,247,0.18), rgba(239,68,68,0.10));
+  border: 1px solid rgba(168,85,247,0.35);
+  border-radius: 10px;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.bld-pill {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #e879f9;
+  background: rgba(168,85,247,0.2);
+  border: 1px solid rgba(168,85,247,0.4);
+  border-radius: 99px;
+  padding: 0.15rem 0.6rem;
+  white-space: nowrap;
+  animation: bldPulse 2s ease-in-out infinite;
+}
+
+@keyframes bldPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.bld-desc {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.55);
+  flex: 1;
+  min-width: 0;
+}
+
+.bld-exit-btn {
+  font-size: 0.74rem;
+  font-weight: 700;
+  background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.4);
+  color: #f87171;
+  border-radius: 8px;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.bld-exit-btn:hover {
+  background: rgba(239,68,68,0.28);
+}
+
+/* ─── BLD fullscreen mode ───────────────────────────── */
+body.terminal-bld-active .terminal-panel {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 80;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(4, 7, 18, 0.99) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+body.terminal-bld-active .terminal-output {
+  flex: 1;
+  max-height: none !important;
+  min-height: 0 !important;
+}
+
+body.terminal-bld-active .app-sidebar,
+body.terminal-bld-active .app-header-section,
+body.terminal-bld-active .chat-detail-panel,
+body.terminal-bld-active .mobile-bottom-nav {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ─── Terminal chat messages ────────────────────────── */
+.terminal-msg {
+  margin: 0.35rem 0;
+  padding: 0.55rem 0.85rem;
+  border-radius: 10px;
+  font-family: ui-monospace, 'Courier New', monospace;
+  font-size: 0.85rem;
+  max-width: 90%;
+}
+
+.terminal-msg-sent {
+  background: rgba(93,140,255,0.12);
+  border: 1px solid rgba(93,140,255,0.25);
+  margin-left: auto;
+  text-align: right;
+}
+
+.terminal-msg-recv {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  margin-right: auto;
+}
+
+.terminal-msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.terminal-msg-sent .terminal-msg-meta {
+  flex-direction: row-reverse;
+}
+
+.tmsg-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #a5b4fc;
+}
+
+.terminal-msg-recv .tmsg-label {
+  color: #6ee7b7;
+}
+
+.tmsg-key {
+  font-size: 0.68rem;
+  color: rgba(255,255,255,0.3);
+  font-family: 'Courier New', monospace;
+}
+
+.tmsg-time {
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.25);
+  margin-left: auto;
+}
+
+.terminal-msg-sent .tmsg-time {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.terminal-msg-body {
+  color: rgba(255,255,255,0.88);
+  line-height: 1.5;
+  word-break: break-word;
 }
 
 .terminal-input-row {

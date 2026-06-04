@@ -20,6 +20,7 @@ class TerminalResponse(BaseModel):
     output: List[str]
     clear: bool = False
     status: str = "ok"
+    extra: dict = {}
 
 
 def _now() -> str:
@@ -126,6 +127,193 @@ AUDIT_LOG = [
 ]
 
 
+ROOT_COMMANDS = {"messages", "privacy", "contacts", "identity", "files", "send", "reply", "actvt"}
+
+_root_last_target: dict = {"id": None, "alias": "Unknown"}
+
+
+def _handle_root_command(raw: str, cmd: str, alias: str, pid: str) -> TerminalResponse:
+    """Handle all @ghost (root-mode) commands."""
+    global _root_last_target
+
+    # ── @ghost actvt modes bld ───────────────────────────────
+    if "actvt modes bld" in cmd:
+        return TerminalResponse(output=[
+            "  ╔══════════════════════════════════════════════════╗",
+            "  ║       BLD MODE ACTIVE — GHOST TERMINAL           ║",
+            "  ║   Anonymous messaging enabled. Root session live. ║",
+            "  ╚══════════════════════════════════════════════════╝",
+            "",
+            f"  Operator : {alias}",
+            f"  Node     : {pid}",
+            f"  Mode     : BLIND (no metadata logged)",
+            f"  Relay    : ghost-relay-eu-01 — encrypted",
+            "",
+            "  Commands:",
+            "  @ghost send <public_id> <message>  — send anonymous message",
+            "  @ghost reply <message>             — reply to last thread",
+            "  @ghost bld exit                    — return to normal terminal",
+        ], status="bld_active")
+
+    # ── @ghost bld exit ──────────────────────────────────────
+    if cmd in {"@ghost bld exit", "@ghost exit bld", "@ghost exit"}:
+        return TerminalResponse(output=[
+            "  BLD MODE deactivated.",
+            "  Terminal returned to standard mode.",
+        ], status="bld_exit")
+
+    # ── @ghost send <public_id> <message> ───────────────────
+    if cmd.startswith("@ghost send "):
+        parts = raw.split(" ", 3)
+        if len(parts) < 4:
+            return TerminalResponse(output=[
+                "  Usage: @ghost send <public_id> <message>",
+                "  Example: @ghost send #ghost-ciphernexus-1042-E Hello!",
+            ], status="error")
+        target_id = parts[2]
+        message = parts[3]
+        target_alias = _parse_alias(target_id)
+        _root_last_target["id"] = target_id
+        _root_last_target["alias"] = target_alias
+        ts = datetime.utcnow().strftime("%H:%M")
+        return TerminalResponse(output=[
+            f"  ──────────────── SECURE THREAD ────────────────",
+            f"  TO      : {target_id}",
+            f"  ALIAS   : {target_alias}",
+            f"  RELAY   : ghost-relay-eu-01",
+            f"  ANON    : true — no metadata retained",
+            f"  ────────────────────────────────────────────────",
+        ], status="send_msg", extra={"direction": "sent", "text": message, "time": ts, "target": target_id, "target_alias": target_alias})
+
+    # ── @ghost reply <message> ───────────────────────────────
+    if cmd.startswith("@ghost reply "):
+        parts = raw.split(" ", 2)
+        message = parts[2] if len(parts) > 2 else ""
+        if not message:
+            return TerminalResponse(output=["  Usage: @ghost reply <message>"], status="error")
+        target_id = _root_last_target.get("id") or "Unknown"
+        target_alias = _root_last_target.get("alias") or "Unknown"
+        ts = datetime.utcnow().strftime("%H:%M")
+        return TerminalResponse(output=[], status="send_msg",
+            extra={"direction": "sent", "text": message, "time": ts, "target": target_id, "target_alias": target_alias})
+
+    # ── @ghost identity ──────────────────────────────────────
+    if cmd in {"@ghost identity", "@ghost id"}:
+        return TerminalResponse(output=[
+            "  ┌──────── ROOT IDENTITY RECORD ────────┐",
+            "",
+            f"  Alias       : {alias}",
+            f"  Public ID   : {pid}",
+            f"  Role        : Ghost Runner (Root Elevated)",
+            f"  Device ID   : device-●●●●●●●●●●●●●●●●",
+            f"  Key type    : X25519 + AES-256-GCM",
+            f"  Private key : @Ghost-●●●●●●● (protected)",
+            f"  Created     : 2026-01-01",
+            f"  Last auth   : {_now()}",
+            "",
+            "  ⚠  Root session active. Clear terminal to end.",
+        ])
+
+    # ── @ghost messages ──────────────────────────────────────
+    if cmd == "@ghost messages":
+        return TerminalResponse(output=[
+            "  ┌──────────── FULL INBOX (ROOT) ────────────┐",
+            "",
+            "  [1] CipherNexus  • #ghost-ciphernexus-1042-E",
+            "      'Ready for GhostTime? I have news.'       — 2m ago  [UNREAD]",
+            "",
+            "  [2] ShadowEcho   • #ghost-shadowecho-1945-E",
+            "      'Can we verify identity? Something odd.'  — 10m ago [UNREAD]",
+            "",
+            "  [3] PhantomDrift • #ghost-phantomdrift-2054-E",
+            "      'Your key looks good. Proceeding.'        — 1h ago",
+            "",
+            "  [4] VoidLink     • #ghost-voidlink-3311-E",
+            "      'Relay handshake complete.'               — 3h ago",
+            "",
+            f"  4 messages — 2 unread  •  Root view enabled",
+            "",
+            "  Use @ghost send <id> <msg> to reply in terminal.",
+        ])
+
+    # ── @ghost contacts ──────────────────────────────────────
+    if cmd == "@ghost contacts":
+        return TerminalResponse(output=[
+            "  ┌──────── CONTACTS (ROOT) ────────┐",
+            "",
+            "  CipherNexus   • #ghost-ciphernexus-1042-E  • TRUSTED  • Online",
+            "  ShadowEcho    • #ghost-shadowecho-1945-E   • TRUSTED  • Away",
+            "  PhantomDrift  • #ghost-phantomdrift-2054-E • TRUSTED  • Offline",
+            "  VoidLink      • #ghost-voidlink-3311-E     • PENDING  • Offline",
+            "  NeonGhost     • #ghost-neonghost-0712-E    • BLOCKED  • Unknown",
+            "",
+            f"  5 total — 3 trusted — 1 pending — 1 blocked",
+            "",
+            "  ⚠  Root view includes pending and blocked contacts.",
+        ])
+
+    # ── @ghost privacy ───────────────────────────────────────
+    if cmd == "@ghost privacy":
+        return TerminalResponse(output=[
+            "  ┌──────── PRIVACY CONTROL (ROOT) ────────┐",
+            "",
+            "  Read receipts    : OFF   [editable]",
+            "  Last seen        : HIDDEN [editable]",
+            "  Profile visible  : CONTACTS ONLY",
+            "  Message logging  : DISABLED",
+            "  IP masking       : ON  — ghost-relay-eu-01",
+            "  Metadata strip   : ON  — all outgoing",
+            "  Zero-knowledge   : ON  — server blind",
+            "  Key rotation     : Every 24h",
+            "  Emergency wipe   : Armed",
+            "",
+            "  ⚠  Root view shows all system privacy flags.",
+            "  Use 'ghost lock' or 'ghost panic' for emergency controls.",
+        ])
+
+    # ── @ghost files ─────────────────────────────────────────
+    if cmd == "@ghost files":
+        return TerminalResponse(output=[
+            "  ┌──────── FILE VAULT (ROOT) ────────┐",
+            "",
+            "  encrypted_note_A1B2.ghost  • 2.4 KB  • shared  • key: ●●●A1B2",
+            "  mission_brief_X9.ghost     • 8.1 KB  • private • key: ●●●X9F3",
+            "  relay_config_draft.ghost   • 1.2 KB  • private • key: ●●●D4C1",
+            "  identity_backup.ghost      • 0.8 KB  • private • key: ●●●E7A9",
+            "",
+            f"  4 files — 1 shared — 3 private",
+            "  All files encrypted with your identity key.",
+            "",
+            "  ⚠  Root view shows encryption key fragments.",
+        ])
+
+    # ── @ghost help ──────────────────────────────────────────
+    if cmd in {"@ghost help", "@ghost"}:
+        return TerminalResponse(output=[
+            "  @ghost — ROOT MODE commands (alias required)",
+            "",
+            "  @ghost identity          — full identity record (private)",
+            "  @ghost messages          — full inbox with message content",
+            "  @ghost contacts          — contacts including blocked/pending",
+            "  @ghost privacy           — full privacy control panel",
+            "  @ghost files             — file vault with key fragments",
+            "  @ghost send <id> <msg>   — send anonymous message in terminal",
+            "  @ghost reply <msg>       — reply to last terminal thread",
+            "  @ghost actvt modes bld   — activate fullscreen BLD terminal",
+            "  @ghost bld exit          — exit BLD mode",
+            "",
+            "  Commands starting with 'ghost' (no @) run in standard mode.",
+        ])
+
+    return TerminalResponse(
+        output=[
+            f"  Unknown root command: '{raw}'",
+            "  Type '@ghost help' to see available root commands.",
+        ],
+        status="error",
+    )
+
+
 @router.post("/terminal", response_model=TerminalResponse)
 async def terminal_command(request: TerminalRequest) -> TerminalResponse:
     raw = request.command.strip()
@@ -134,9 +322,13 @@ async def terminal_command(request: TerminalRequest) -> TerminalResponse:
     alias = _parse_alias(public_id) if public_id else "Ghost"
     pid = public_id or "@Ghost-Unknown-0000"
 
+    # ── @ghost root commands ──────────────────────────────────
+    if cmd.startswith("@ghost"):
+        return _handle_root_command(raw, cmd, alias, pid)
+
     if not cmd.startswith("ghost"):
         return TerminalResponse(
-            output=[f"  Unknown command: '{raw}'", "  All commands begin with 'ghost'. Type 'ghost help' to see available commands."],
+            output=[f"  Unknown command: '{raw}'", "  Commands start with 'ghost' or '@ghost' (root). Type 'ghost help'."],
             status="error",
         )
 
