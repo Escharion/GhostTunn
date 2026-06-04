@@ -11,7 +11,6 @@ const appShell = document.getElementById('appShell');
 const manualIdentityInput = document.getElementById('manualIdentityInput');
 const useExistingIdentityButton = document.getElementById('useExistingIdentity');
 const accountPublicKey = document.getElementById('accountPublicKey');
-const profileAvatar = document.getElementById('profileAvatar');
 const addFriendButton = document.getElementById('addFriendButton');
 const chatListElement = document.getElementById('chatList');
 const chatTabs = document.querySelectorAll('.chat-tab');
@@ -40,6 +39,32 @@ const terminalInput = document.getElementById('terminalInput');
 const terminalClear = document.getElementById('terminalClear');
 const copySecurityIdentity = document.getElementById('copySecurityIdentity');
 const securityIdentityKey = document.getElementById('securityIdentityKey');
+
+// Profile drawer elements
+const sidebarProfileBtn = document.getElementById('sidebarProfileBtn');
+const topbarProfileBtn = document.getElementById('topbarProfileBtn');
+const mobileProfileBtn = document.getElementById('mobileProfileBtn');
+const profileDrawer = document.getElementById('profileDrawer');
+const profileDrawerOverlay = document.getElementById('profileDrawerOverlay');
+const profileDrawerClose = document.getElementById('profileDrawerClose');
+const profileDisplayAlias = document.getElementById('profileDisplayAlias');
+const profilePublicKeyDisplay = document.getElementById('profilePublicKeyDisplay');
+const profileIdentityDisplay = document.getElementById('profileIdentityDisplay');
+const profileKeyToggle = document.getElementById('profileKeyToggle');
+const profileKeyCopy = document.getElementById('profileKeyCopy');
+const profileLogoutBtn = document.getElementById('profileLogoutBtn');
+
+// All avatar elements
+const sidebarAvatar = document.getElementById('sidebarAvatar');
+const sidebarAvatarInitials = document.getElementById('sidebarAvatarInitials');
+const topbarAvatar = document.getElementById('topbarAvatar');
+const topbarAvatarInitials = document.getElementById('topbarAvatarInitials');
+const mobileNavAvatar = document.getElementById('mobileNavAvatar');
+const mobileNavAvatarInitials = document.getElementById('mobileNavAvatarInitials');
+const profileDrawerAvatar = document.getElementById('profileDrawerAvatar');
+const profileDrawerAvatarInitials = document.getElementById('profileDrawerAvatarInitials');
+
+let profileKeyRevealed = false;
 
 let activeFilter = 'all';
 let activeChatId = null;
@@ -206,13 +231,43 @@ function generateAvatarColor(publicKey) {
   const hue = hash % 360;
   const secondary = (hue + 50) % 360;
   const tertiary = (hue + 110) % 360;
-  return `radial-gradient(circle at 20% 20%, hsl(${hue}, 85%, 60%), transparent 20%), radial-gradient(circle at 80% 30%, hsl(${secondary}, 75%, 60%), transparent 18%), radial-gradient(circle at 50% 70%, hsl(${tertiary}, 65%, 55%), transparent 24%)`;
+  return `radial-gradient(circle at 20% 20%, hsl(${hue}, 85%, 60%), hsl(${secondary}, 75%, 50%) 55%, hsl(${tertiary}, 65%, 40%))`;
+}
+
+function extractAliasFromKey(publicKey) {
+  // e.g. #ghost-ciphernexus-1042-E → "Ciphernexus"
+  const match = publicKey.match(/#ghost-([a-z]+)-\d{4}-E/i);
+  if (!match) return 'Ghost';
+  const raw = match[1];
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+function getAvatarInitials(publicKey) {
+  const alias = extractAliasFromKey(publicKey);
+  // Take first two chars of alias as initials
+  return alias.slice(0, 2).toUpperCase();
 }
 
 function applyAvatar(publicKey) {
-  if (!profileAvatar) return;
-  profileAvatar.style.background = generateAvatarColor(publicKey);
-  profileAvatar.textContent = publicKey.slice(7, 9).toUpperCase();
+  const gradient = generateAvatarColor(publicKey);
+  const initials = getAvatarInitials(publicKey);
+  const alias = extractAliasFromKey(publicKey);
+
+  // Apply to all avatar circles
+  const circles = [sidebarAvatar, topbarAvatar, mobileNavAvatar, profileDrawerAvatar];
+  const initialsEls = [sidebarAvatarInitials, topbarAvatarInitials, mobileNavAvatarInitials, profileDrawerAvatarInitials];
+
+  circles.forEach((el) => { if (el) el.style.background = gradient; });
+  initialsEls.forEach((el) => { if (el) el.textContent = initials; });
+
+  // Update profile drawer info
+  if (profileDisplayAlias) profileDisplayAlias.textContent = alias;
+  if (profilePublicKeyDisplay) profilePublicKeyDisplay.textContent = publicKey;
+
+  // Keep identity key masked by default
+  profileKeyRevealed = false;
+  if (profileIdentityDisplay) profileIdentityDisplay.textContent = '••••••••••••••••••••';
+  if (profileIdentityDisplay) profileIdentityDisplay.classList.remove('revealed');
 }
 
 function saveIdentityToStorage(publicKey, privateKey, identityKey) {
@@ -788,6 +843,76 @@ contactForm?.addEventListener('submit', (event) => {
   if (emailInput && emailInput.value) {
     alert(`Thanks! ${emailInput.value} has been added to the GhostTunn updates list.`);
     emailInput.value = '';
+  }
+});
+
+// ─── Profile Drawer ───────────────────────────────────────────
+function openProfileDrawer() {
+  if (!profileDrawer || !profileDrawerOverlay) return;
+
+  // Refresh identity display from storage each time we open
+  const storedIdentity = localStorage.getItem(IDENTITY_STORAGE_KEY) || '';
+  profileKeyRevealed = false;
+  if (profileIdentityDisplay) {
+    profileIdentityDisplay.textContent = '••••••••••••••••••••';
+    profileIdentityDisplay.classList.remove('revealed');
+    profileIdentityDisplay.dataset.full = storedIdentity;
+  }
+
+  profileDrawerOverlay.classList.add('open');
+  profileDrawerOverlay.setAttribute('aria-hidden', 'false');
+  profileDrawer.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeProfileDrawer() {
+  if (!profileDrawer || !profileDrawerOverlay) return;
+  profileDrawer.classList.remove('open');
+  profileDrawerOverlay.classList.remove('open');
+  profileDrawerOverlay.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+sidebarProfileBtn?.addEventListener('click', openProfileDrawer);
+topbarProfileBtn?.addEventListener('click', openProfileDrawer);
+mobileProfileBtn?.addEventListener('click', openProfileDrawer);
+profileDrawerClose?.addEventListener('click', closeProfileDrawer);
+profileDrawerOverlay?.addEventListener('click', closeProfileDrawer);
+
+profileKeyToggle?.addEventListener('click', () => {
+  if (!profileIdentityDisplay) return;
+  profileKeyRevealed = !profileKeyRevealed;
+  if (profileKeyRevealed) {
+    profileIdentityDisplay.textContent = profileIdentityDisplay.dataset.full || '—';
+    profileIdentityDisplay.classList.add('revealed');
+    profileKeyToggle.textContent = '🙈';
+  } else {
+    profileIdentityDisplay.textContent = '••••••••••••••••••••';
+    profileIdentityDisplay.classList.remove('revealed');
+    profileKeyToggle.textContent = '👁';
+  }
+});
+
+profileKeyCopy?.addEventListener('click', () => {
+  const key = profileIdentityDisplay?.dataset.full || '';
+  if (!key) return;
+  copyText(key);
+});
+
+profileLogoutBtn?.addEventListener('click', () => {
+  if (!confirm('Sign out? Your identity key will be cleared from this device. Make sure you have it saved before continuing.')) return;
+  localStorage.removeItem(DEVICE_STORAGE_KEY);
+  localStorage.removeItem(PUBLIC_STORAGE_KEY);
+  localStorage.removeItem(PRIVATE_STORAGE_KEY);
+  localStorage.removeItem(IDENTITY_STORAGE_KEY);
+  closeProfileDrawer();
+  location.reload();
+});
+
+// Close drawer with Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && profileDrawer?.classList.contains('open')) {
+    closeProfileDrawer();
   }
 });
 

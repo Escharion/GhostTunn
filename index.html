@@ -154,13 +154,20 @@
             <button class="sidebar-icon" data-view="ghosttime" aria-label="GhostTime" title="GhostTime">📝</button>
             <button class="sidebar-icon" data-view="terminal" aria-label="Terminal" title="Terminal">⌨️</button>
           </div>
+          <div class="sidebar-bottom">
+            <button class="sidebar-avatar-btn" id="sidebarProfileBtn" aria-label="Profile & Settings" title="Profile & Settings">
+              <div class="avatar-circle" id="sidebarAvatar"><span class="avatar-initials" id="sidebarAvatarInitials">GH</span></div>
+            </button>
+          </div>
         </nav>
 
         <div class="app-main">
           <div class="app-header-section">
             <div class="app-topbar">
               <h1 class="app-title glow"></h1>
-              <button class="header-icon" id="headerMenuButton">⚙️</button>
+              <button class="topbar-profile-btn" id="topbarProfileBtn" aria-label="Profile & Settings">
+                <div class="avatar-circle avatar-circle--sm" id="topbarAvatar"><span class="avatar-initials" id="topbarAvatarInitials">GH</span></div>
+              </button>
             </div>
             <div class="search-action-row">
               <div class="search-bar-container">
@@ -248,7 +255,67 @@
           <span class="mobile-nav-icon">⌨️</span>
           <span class="mobile-nav-label">Terminal</span>
         </button>
+        <button class="mobile-nav-btn" id="mobileProfileBtn" aria-label="Profile">
+          <span class="mobile-nav-icon">
+            <div class="avatar-circle avatar-circle--xs" id="mobileNavAvatar"><span class="avatar-initials" id="mobileNavAvatarInitials">GH</span></div>
+          </span>
+          <span class="mobile-nav-label">Profile</span>
+        </button>
       </nav>
+
+      <!-- Profile / Settings Drawer -->
+      <div class="profile-drawer-overlay" id="profileDrawerOverlay" aria-hidden="true"></div>
+      <aside class="profile-drawer" id="profileDrawer" aria-label="Profile & Settings" role="dialog">
+        <div class="profile-drawer-header">
+          <span class="profile-drawer-title">Profile</span>
+          <button class="profile-drawer-close" id="profileDrawerClose" aria-label="Close">✕</button>
+        </div>
+
+        <div class="profile-drawer-body">
+          <!-- Avatar card -->
+          <div class="profile-avatar-card">
+            <div class="avatar-circle avatar-circle--lg" id="profileDrawerAvatar">
+              <span class="avatar-initials" id="profileDrawerAvatarInitials">GH</span>
+            </div>
+            <div class="profile-alias-block">
+              <p class="profile-alias" id="profileDisplayAlias">Ghost User</p>
+              <p class="profile-alias-sub" id="profilePublicKeyDisplay">#ghost-…</p>
+            </div>
+          </div>
+
+          <!-- Identity key row -->
+          <div class="profile-setting-group">
+            <p class="profile-group-label">Identity key</p>
+            <div class="profile-key-row">
+              <span class="profile-key-value" id="profileIdentityDisplay">••••••••••••</span>
+              <button class="profile-key-toggle" id="profileKeyToggle" aria-label="Show / hide key">👁</button>
+              <button class="profile-key-copy" id="profileKeyCopy" aria-label="Copy identity key">Copy</button>
+            </div>
+          </div>
+
+          <!-- Settings toggles -->
+          <div class="profile-setting-group">
+            <p class="profile-group-label">Privacy</p>
+            <label class="profile-toggle-row">
+              <span>Ghost mode (always on)</span>
+              <span class="profile-toggle-badge">On</span>
+            </label>
+            <label class="profile-toggle-row">
+              <span>Encrypt messages</span>
+              <span class="profile-toggle-badge">On</span>
+            </label>
+            <label class="profile-toggle-row">
+              <span>Hide read receipts</span>
+              <span class="profile-toggle-badge">On</span>
+            </label>
+          </div>
+
+          <!-- Log out -->
+          <div class="profile-setting-group">
+            <button class="btn btn-danger profile-logout-btn" id="profileLogoutBtn">Sign out of this device</button>
+          </div>
+        </div>
+      </aside>
     </section>
   </main>
 
