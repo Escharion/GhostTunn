@@ -7,6 +7,16 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- ─── Splash Screen ─────────────────────────────── -->
+  <div id="ghostSplash" class="ghost-splash">
+    <div class="ghost-splash-ring-wrap">
+      <div class="ghost-splash-ring"></div>
+      <img src="/logo.jpeg" alt="GhostTunn" class="ghost-splash-logo" />
+    </div>
+    <p class="ghost-splash-name">GhostTunn</p>
+    <p class="ghost-splash-sub">Privacy-first communication</p>
+  </div>
+
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="#home">
@@ -326,9 +336,30 @@
             </div>
           </div>
 
-          <!-- Identity key row -->
+          <!-- Public Key -->
           <div class="profile-setting-group">
-            <p class="profile-group-label">Identity key</p>
+            <p class="profile-group-label">Public Key</p>
+            <div class="profile-key-row">
+              <span class="profile-key-value revealed" id="profilePubKeyDisplay">#ghost-…</span>
+              <button class="profile-key-copy" id="profilePubKeyCopy" aria-label="Copy public key">Copy</button>
+            </div>
+            <p class="profile-key-note">Share this with others to connect.</p>
+          </div>
+
+          <!-- Private Key -->
+          <div class="profile-setting-group">
+            <p class="profile-group-label">Private Key</p>
+            <div class="profile-key-row">
+              <span class="profile-key-value" id="profilePrivKeyDisplay">••••••••••••••</span>
+              <button class="profile-key-toggle" id="profilePrivKeyToggle" aria-label="Show / hide private key">👁</button>
+              <button class="profile-key-copy" id="profilePrivKeyCopy" aria-label="Copy private key">Copy</button>
+            </div>
+            <p class="profile-key-note">Never share this — it's your identity secret.</p>
+          </div>
+
+          <!-- Full Identity key -->
+          <div class="profile-setting-group">
+            <p class="profile-group-label">Full Identity key</p>
             <div class="profile-key-row">
               <span class="profile-key-value" id="profileIdentityDisplay">••••••••••••</span>
               <button class="profile-key-toggle" id="profileKeyToggle" aria-label="Show / hide key">👁</button>
@@ -371,13 +402,36 @@
 
       <div class="tab-panels">
         <div class="tab-panel active" id="identityTab" role="tabpanel">
-          <div class="key-block">
+
+          <!-- Public Key -->
+          <div class="key-block key-block--pub">
             <div class="key-label">
-              <strong>Identity key</strong>
+              <strong>Public Key</strong>
+              <button class="copy-btn" id="copyLoginPubKey">Copy</button>
+            </div>
+            <p class="key-value key-value--pub" id="loginPublicKeyDisplay">#ghost-...-0000-E</p>
+            <p class="tab-note">Your address on GhostTunn. Share this so others can find and message you.</p>
+          </div>
+
+          <!-- Private Key -->
+          <div class="key-block key-block--priv">
+            <div class="key-label">
+              <strong>Private Key</strong>
+              <button class="key-reveal-btn" id="toggleLoginPrivKey">Show</button>
+              <button class="copy-btn" id="copyLoginPrivKey">Copy</button>
+            </div>
+            <p class="key-value key-value--hidden" id="loginPrivateKeyDisplay">••••••••••••••••</p>
+            <p class="tab-note">Never share this. Your private key lives only on this device — it proves you are you.</p>
+          </div>
+
+          <!-- Combined Identity key -->
+          <div class="key-block key-block--identity">
+            <div class="key-label">
+              <strong>Full Identity key</strong>
               <button class="copy-btn" id="copyIdentity">Copy</button>
             </div>
             <p class="key-value" id="identityKeyValue">#ghost-...-0000-E abc1234</p>
-            <p class="tab-note">A composite identity string combining your public and private key data. Keep this secret and safe.</p>
+            <p class="tab-note">Save this full string to restore your identity on another device. Keep it private.</p>
           </div>
         </div>
       </div>

@@ -1,3 +1,13 @@
+// ─── Splash screen dismiss ───────────────────────────────────
+(function ghostSplashDismiss() {
+  const splash = document.getElementById('ghostSplash');
+  if (!splash) return;
+  setTimeout(() => {
+    splash.classList.add('fade-out');
+    setTimeout(() => splash.remove(), 750);
+  }, 2200);
+})();
+
 const menuToggle = document.getElementById('menuToggle');
 const siteNav = document.getElementById('siteNav');
 const demoGhostId = document.getElementById('demoGhostId');
@@ -243,6 +253,18 @@ function updateLoginKeys() {
   if (identityKeyValue) identityKeyValue.textContent = identityKey;
   if (ghostIdValue) ghostIdValue.textContent = `Ghost ID: ${publicKey}`;
 
+  // Populate separated public / private key displays in login overlay
+  const loginPubEl = document.getElementById('loginPublicKeyDisplay');
+  const loginPrivEl = document.getElementById('loginPrivateKeyDisplay');
+  const toggleBtn = document.getElementById('toggleLoginPrivKey');
+  if (loginPubEl) loginPubEl.textContent = publicKey;
+  if (loginPrivEl) {
+    loginPrivEl.textContent = '••••••••••••••••';
+    loginPrivEl.dataset.real = privateKey;
+    loginPrivEl.classList.add('key-value--hidden');
+  }
+  if (toggleBtn) toggleBtn.textContent = 'Show';
+
   // Store in data attributes for use by continueButton
   if (identityKeyValue) {
     identityKeyValue.dataset.publicKey = publicKey;
@@ -380,6 +402,16 @@ function loadAppWithKeys(publicKey, privateKey) {
   if (identityKeyValue) identityKeyValue.textContent = identityKey;
   if (securityIdentityKey) securityIdentityKey.textContent = identityKey;
   applyAvatar(publicKey);
+
+  // Populate separate public / private key rows in profile drawer
+  const profilePubEl = document.getElementById('profilePubKeyDisplay');
+  const profilePrivEl = document.getElementById('profilePrivKeyDisplay');
+  if (profilePubEl) profilePubEl.textContent = publicKey;
+  if (profilePrivEl) {
+    profilePrivEl.textContent = '••••••••••••••';
+    profilePrivEl.dataset.real = privateKey;
+    profilePrivEl.classList.remove('revealed');
+  }
 }
 
 function showAppScreen() {
@@ -783,6 +815,72 @@ if (demoGhostId) {
 if (copyIdentity) {
   copyIdentity.addEventListener('click', () => {
     if (identityKeyValue) copyText(identityKeyValue.textContent || '');
+  });
+}
+
+// ── Login overlay: public key copy ───────────────────────────
+const copyLoginPubKey = document.getElementById('copyLoginPubKey');
+if (copyLoginPubKey) {
+  copyLoginPubKey.addEventListener('click', () => {
+    const el = document.getElementById('loginPublicKeyDisplay');
+    if (el) copyText(el.textContent || '');
+  });
+}
+
+// ── Login overlay: private key reveal + copy ─────────────────
+const toggleLoginPrivKey = document.getElementById('toggleLoginPrivKey');
+if (toggleLoginPrivKey) {
+  toggleLoginPrivKey.addEventListener('click', () => {
+    const el = document.getElementById('loginPrivateKeyDisplay');
+    if (!el) return;
+    const isHidden = el.textContent.startsWith('•');
+    if (isHidden) {
+      el.textContent = el.dataset.real || '';
+      el.classList.remove('key-value--hidden');
+      toggleLoginPrivKey.textContent = 'Hide';
+    } else {
+      el.textContent = '••••••••••••••••';
+      el.classList.add('key-value--hidden');
+      toggleLoginPrivKey.textContent = 'Show';
+    }
+  });
+}
+
+const copyLoginPrivKey = document.getElementById('copyLoginPrivKey');
+if (copyLoginPrivKey) {
+  copyLoginPrivKey.addEventListener('click', () => {
+    const el = document.getElementById('loginPrivateKeyDisplay');
+    if (el) copyText(el.dataset.real || '');
+  });
+}
+
+// ── Profile drawer: pub key copy ─────────────────────────────
+const profilePubKeyCopy = document.getElementById('profilePubKeyCopy');
+if (profilePubKeyCopy) {
+  profilePubKeyCopy.addEventListener('click', () => {
+    const el = document.getElementById('profilePubKeyDisplay');
+    if (el) copyText(el.textContent || '');
+  });
+}
+
+// ── Profile drawer: private key reveal + copy ────────────────
+const profilePrivKeyToggle = document.getElementById('profilePrivKeyToggle');
+if (profilePrivKeyToggle) {
+  let privRevealed = false;
+  profilePrivKeyToggle.addEventListener('click', () => {
+    const el = document.getElementById('profilePrivKeyDisplay');
+    if (!el) return;
+    privRevealed = !privRevealed;
+    el.textContent = privRevealed ? (el.dataset.real || '') : '••••••••••••••';
+    el.classList.toggle('revealed', privRevealed);
+  });
+}
+
+const profilePrivKeyCopy = document.getElementById('profilePrivKeyCopy');
+if (profilePrivKeyCopy) {
+  profilePrivKeyCopy.addEventListener('click', () => {
+    const el = document.getElementById('profilePrivKeyDisplay');
+    if (el) copyText(el.dataset.real || '');
   });
 }
 
