@@ -1,4 +1,30 @@
 <!DOCTYPE html>
+<!-- ═══════════════════════════════════════════════════════════
+     GhostTunn — index.html
+     Privacy-first anonymous communication platform.
+
+     PAGE STRUCTURE:
+     1.  #ghostSplash          — full-screen logo splash (removed from DOM after 2.2 s)
+     2.  <header>              — landing-page top nav
+     3.  <main>
+         a. #hero              — landing hero section (CTA → login overlay)
+         b. #features          — feature highlights grid
+         c. #architecture      — how the relay works
+         d. #security          — key generation explainer
+         e. #loginOverlay      — full-screen identity creation/restore dialog
+         f. #appShell          — main app (hidden until logged in)
+            · .app-sidebar     — desktop left icon nav
+            · .app-topbar      — mobile top bar
+            · #chatView        — conversation list + detail panel
+            · #ghosttimeView   — social feed
+            · #accountView     — account settings
+            · #terminalView    — @ghost terminal
+            · .mobile-nav      — bottom nav bar (mobile)
+         g. #profileDrawer     — settings drawer (slides from right)
+         h. #profileDrawerOverlay — semi-transparent backdrop for drawer
+     4.  <footer>              — contact form + social links
+     5.  <script src="script.js">
+     ═══════════════════════════════════════════════════════════ -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />

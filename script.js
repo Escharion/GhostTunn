@@ -1,96 +1,156 @@
-// ─── Splash screen dismiss ───────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+//  GhostTunn — script.js
+//  Main client-side JavaScript for the GhostTunn privacy platform.
+//
+//  STRUCTURE OF THIS FILE:
+//  1.  Splash screen dismiss
+//  2.  DOM element references (constants)
+//  3.  App state variables
+//  4.  Demo chat data
+//  5.  localStorage keys + init helpers
+//  6.  Key generation (public/private/identity keys)
+//  7.  Avatar helpers (colour, initials, photo)
+//  8.  App view switching (sidebar / mobile nav)
+//  9.  Chat list & chat detail rendering
+//  10. GhostTime (social post feed)
+//  11. Login overlay logic + identity management
+//  12. Notification bell
+//  13. Profile drawer (settings, keys, avatar upload)
+//  14. Terminal / @ghost root-mode command system
+//  15. Event listeners (navigation, search, send, etc.)
+// ═══════════════════════════════════════════════════════════════
+
+
+// ─── 1. SPLASH SCREEN DISMISS ────────────────────────────────
+// The splash overlay (#ghostSplash) shows the logo on first load.
+// After 2.2 s we fade it out, then delete it from the DOM entirely
+// so it doesn't block interaction with the page underneath.
 (function ghostSplashDismiss() {
   const splash = document.getElementById('ghostSplash');
   if (!splash) return;
   setTimeout(() => {
-    splash.classList.add('fade-out');
-    setTimeout(() => splash.remove(), 750);
+    splash.classList.add('fade-out');           // triggers CSS opacity → 0 transition
+    setTimeout(() => splash.remove(), 750);    // remove after transition finishes
   }, 2200);
 })();
 
-const menuToggle = document.getElementById('menuToggle');
-const siteNav = document.getElementById('siteNav');
-const demoGhostId = document.getElementById('demoGhostId');
-const ghostIdValue = document.getElementById('ghostIdValue');
-const contactForm = document.getElementById('contactForm');
-const loginOverlay = document.getElementById('loginOverlay');
-const identityKeyValue = document.getElementById('identityKeyValue');
-const continueButton = document.getElementById('continueButton');
-const copyIdentity = document.getElementById('copyIdentity');
-const appShell = document.getElementById('appShell');
-const manualIdentityInput = document.getElementById('manualIdentityInput');
-const useExistingIdentityButton = document.getElementById('useExistingIdentity');
-const accountPublicKey = document.getElementById('accountPublicKey');
-const addFriendButton = document.getElementById('addFriendButton');
-const chatListElement = document.getElementById('chatList');
-const chatTabs = document.querySelectorAll('.chat-tab');
-const chatView = document.getElementById('chatView');
-const ghosttimeView = document.getElementById('ghosttimeView');
-const accountView = document.getElementById('accountView');
-const chatDetailPanel = document.getElementById('chatDetailPanel');
-const messageInputArea = document.getElementById('messageInputArea');
-const searchActionRow = document.querySelector('.search-action-row');
-const appTopbar = document.querySelector('.app-topbar');
-const backToChatListButton = document.getElementById('backToChatListButton');
-const chatDetailTitle = document.getElementById('chatDetailTitle');
-const chatDetailSubtitle = document.getElementById('chatDetailSubtitle');
-const messagesContainer = document.getElementById('messagesContainer');
-const messageInput = document.getElementById('messageInput');
-const sendButton = document.getElementById('sendButton');
-const appSidebar = document.querySelector('.app-sidebar');
-const sidebarIcons = document.querySelectorAll('.sidebar-icon');
-const mobileNavBtns = document.querySelectorAll('.mobile-nav-btn');
-const gtPostText = document.getElementById('gtPostText');
-const gtPostList = document.getElementById('gtPostList');
-const publishGtPostButton = document.getElementById('publishGtPost');
-const terminalView = document.getElementById('terminalView');
-const terminalOutput = document.getElementById('terminalOutput');
-const terminalInput = document.getElementById('terminalInput');
-const terminalClear = document.getElementById('terminalClear');
-const copySecurityIdentity = document.getElementById('copySecurityIdentity');
-const securityIdentityKey = document.getElementById('securityIdentityKey');
 
-// Profile drawer elements
-const sidebarProfileBtn = document.getElementById('sidebarProfileBtn');
-const topbarProfileBtn = document.getElementById('topbarProfileBtn');
-const mobileProfileBtn = document.getElementById('mobileProfileBtn');
-const profileDrawer = document.getElementById('profileDrawer');
-const profileDrawerOverlay = document.getElementById('profileDrawerOverlay');
-const profileDrawerClose = document.getElementById('profileDrawerClose');
-const profileDisplayAlias = document.getElementById('profileDisplayAlias');
-const profilePublicKeyDisplay = document.getElementById('profilePublicKeyDisplay');
-const profileIdentityDisplay = document.getElementById('profileIdentityDisplay');
-const profileKeyToggle = document.getElementById('profileKeyToggle');
-const profileKeyCopy = document.getElementById('profileKeyCopy');
-const profileLogoutBtn = document.getElementById('profileLogoutBtn');
+// ─── 2. DOM ELEMENT REFERENCES ───────────────────────────────
+// We grab every interactive element we need once at startup and
+// store them in constants.  This is faster than calling
+// getElementById/querySelector repeatedly inside event handlers.
 
-// All avatar elements
-const sidebarAvatar = document.getElementById('sidebarAvatar');
-const sidebarAvatarInitials = document.getElementById('sidebarAvatarInitials');
-const sidebarPhoto = document.getElementById('sidebarPhoto');
-const topbarAvatar = document.getElementById('topbarAvatar');
-const topbarAvatarInitials = document.getElementById('topbarAvatarInitials');
-const topbarPhoto = document.getElementById('topbarPhoto');
-const mobileNavAvatar = document.getElementById('mobileNavAvatar');
+// ── Landing-page & login elements ────────────────────────────
+const menuToggle          = document.getElementById('menuToggle');       // hamburger ≡ button
+const siteNav             = document.getElementById('siteNav');          // nav links bar
+const demoGhostId         = document.getElementById('demoGhostId');      // "Start" hero button
+const ghostIdValue        = document.getElementById('ghostIdValue');     // hero Ghost ID display
+const contactForm         = document.getElementById('contactForm');      // footer contact form
+const loginOverlay        = document.getElementById('loginOverlay');     // full-screen identity dialog
+const identityKeyValue    = document.getElementById('identityKeyValue'); // combined key text (login overlay)
+const continueButton      = document.getElementById('continueButton');   // "Continue" in login overlay
+const copyIdentity        = document.getElementById('copyIdentity');     // copy full identity key
+const appShell            = document.getElementById('appShell');         // the main app section (hidden until logged in)
+const manualIdentityInput = document.getElementById('manualIdentityInput'); // paste-existing-key input
+const useExistingIdentityButton = document.getElementById('useExistingIdentity'); // restore identity button
+
+// ── App-shell utility elements ────────────────────────────────
+const accountPublicKey    = document.getElementById('accountPublicKey'); // account tab public key display
+const addFriendButton     = document.getElementById('addFriendButton');  // "+" add-contact button
+const chatListElement     = document.getElementById('chatList');         // scrollable conversation list
+const chatTabs            = document.querySelectorAll('.chat-tab');      // All / Unread / Requests buttons
+const chatView            = document.getElementById('chatView');         // chat list view panel
+const ghosttimeView       = document.getElementById('ghosttimeView');    // social feed panel
+const accountView         = document.getElementById('accountView');      // account settings panel
+const chatDetailPanel     = document.getElementById('chatDetailPanel'); // sliding conversation detail panel
+const messageInputArea    = document.getElementById('messageInputArea');// compose bar (hidden until chat opens)
+const searchActionRow     = document.querySelector('.search-action-row');// search + add-friend row
+const appTopbar           = document.querySelector('.app-topbar');       // mobile top bar
+const backToChatListButton = document.getElementById('backToChatListButton'); // ← back in chat detail
+const chatDetailTitle     = document.getElementById('chatDetailTitle'); // contact name in chat header
+const chatDetailSubtitle  = document.getElementById('chatDetailSubtitle'); // online status / public key
+const messagesContainer   = document.getElementById('messagesContainer'); // scrollable bubble list
+const messageInput        = document.getElementById('messageInput');    // message text field
+const sendButton          = document.getElementById('sendButton');      // send button
+const appSidebar          = document.querySelector('.app-sidebar');     // left icon sidebar
+const sidebarIcons        = document.querySelectorAll('.sidebar-icon'); // each sidebar navigation icon
+const mobileNavBtns       = document.querySelectorAll('.mobile-nav-btn'); // bottom-nav buttons on mobile
+
+// ── GhostTime (social feed) elements ─────────────────────────
+const gtPostText          = document.getElementById('gtPostText');      // post textarea
+const gtPostList          = document.getElementById('gtPostList');      // rendered post list
+const publishGtPostButton = document.getElementById('publishGtPost');  // publish button
+
+// ── Terminal elements ─────────────────────────────────────────
+const terminalView   = document.getElementById('terminalView');   // the terminal view panel
+const terminalOutput = document.getElementById('terminalOutput'); // terminal line output area
+const terminalInput  = document.getElementById('terminalInput');  // the single-line command input
+const terminalClear  = document.getElementById('terminalClear');  // "clear" button
+
+// ── Security section elements (landing page) ──────────────────
+const copySecurityIdentity = document.getElementById('copySecurityIdentity'); // copy identity in security section
+const securityIdentityKey  = document.getElementById('securityIdentityKey');  // identity key display in security section
+
+// ── Profile drawer elements ───────────────────────────────────
+// The profile drawer slides in from the right.  It is opened via
+// the avatar icon in the sidebar, topbar (mobile), or mobile nav.
+const sidebarProfileBtn     = document.getElementById('sidebarProfileBtn');
+const topbarProfileBtn      = document.getElementById('topbarProfileBtn');
+const mobileProfileBtn      = document.getElementById('mobileProfileBtn');
+const profileDrawer         = document.getElementById('profileDrawer');
+const profileDrawerOverlay  = document.getElementById('profileDrawerOverlay');
+const profileDrawerClose    = document.getElementById('profileDrawerClose');
+const profileDisplayAlias   = document.getElementById('profileDisplayAlias');   // alias text in drawer header
+const profilePublicKeyDisplay = document.getElementById('profilePublicKeyDisplay'); // sub-title public key
+const profileIdentityDisplay  = document.getElementById('profileIdentityDisplay'); // masked combined key
+const profileKeyToggle        = document.getElementById('profileKeyToggle');  // 👁 show/hide full identity
+const profileKeyCopy          = document.getElementById('profileKeyCopy');    // copy full identity key
+const profileLogoutBtn        = document.getElementById('profileLogoutBtn');  // sign-out button
+
+// ── Avatar elements ───────────────────────────────────────────
+// The same avatar appears in three places: sidebar (desktop),
+// topbar (mobile), and the profile drawer.  All three are kept
+// in sync whenever the user changes their photo or identity.
+const sidebarAvatar           = document.getElementById('sidebarAvatar');
+const sidebarAvatarInitials   = document.getElementById('sidebarAvatarInitials');
+const sidebarPhoto            = document.getElementById('sidebarPhoto');
+const topbarAvatar            = document.getElementById('topbarAvatar');
+const topbarAvatarInitials    = document.getElementById('topbarAvatarInitials');
+const topbarPhoto             = document.getElementById('topbarPhoto');
+const mobileNavAvatar         = document.getElementById('mobileNavAvatar');
 const mobileNavAvatarInitials = document.getElementById('mobileNavAvatarInitials');
-const mobileNavPhoto = document.getElementById('mobileNavPhoto');
-const profileDrawerAvatar = document.getElementById('profileDrawerAvatar');
+const mobileNavPhoto          = document.getElementById('mobileNavPhoto');
+const profileDrawerAvatar         = document.getElementById('profileDrawerAvatar');
 const profileDrawerAvatarInitials = document.getElementById('profileDrawerAvatarInitials');
-const profileDrawerPhoto = document.getElementById('profileDrawerPhoto');
+const profileDrawerPhoto          = document.getElementById('profileDrawerPhoto');
 
-// Upload controls
-const avatarUploadBtn = document.getElementById('avatarUploadBtn');
-const avatarRemoveBtn = document.getElementById('avatarRemoveBtn');
-const avatarFileInput = document.getElementById('avatarFileInput');
-const avatarUploadHint = document.getElementById('avatarUploadHint');
+// ── Avatar upload controls ────────────────────────────────────
+const avatarUploadBtn = document.getElementById('avatarUploadBtn'); // 📷 camera button
+const avatarRemoveBtn = document.getElementById('avatarRemoveBtn'); // ✕ remove button
+const avatarFileInput = document.getElementById('avatarFileInput'); // hidden <input type="file">
+const avatarUploadHint = document.getElementById('avatarUploadHint'); // "Tap 📷" hint text
 
-let profileKeyRevealed = false;
 
-const AVATAR_PHOTO_KEY = 'ghostAvatarPhoto';
+// ─── 3. APP STATE VARIABLES ──────────────────────────────────
+// These `let` variables hold runtime state that changes as the
+// user interacts.  They are purposely module-level (not inside
+// functions) so all functions in this file can read/write them.
 
-let activeFilter = 'all';
-let activeChatId = null;
-let chatSearchQuery = '';
+let profileKeyRevealed = false; // tracks whether the full identity key is visible in the drawer
+
+
+// ─── 4. STORAGE KEYS ─────────────────────────────────────────
+// We use localStorage to persist the user's identity and photo
+// between page reloads.  These keys are the localStorage property
+// names — keep them stable across updates or old data is lost.
+
+const AVATAR_PHOTO_KEY = 'ghostAvatarPhoto'; // base64 JPEG of the user's profile photo
+
+
+// ─── 5. CHAT / UI STATE ──────────────────────────────────────
+let activeFilter    = 'all';  // current chat-list filter: 'all' | 'unread' | 'requests'
+let activeChatId    = null;   // id of the currently open conversation (null = none)
+let chatSearchQuery = '';     // current text in the search bar
 
 const chatData = [
   {
@@ -162,10 +222,14 @@ const gtComments = {
   ]
 };
 
-const DEVICE_STORAGE_KEY = 'ghostDeviceId';
-const PUBLIC_STORAGE_KEY = 'ghostPublicKey';
-const PRIVATE_STORAGE_KEY = 'ghostPrivateKey';
-const IDENTITY_STORAGE_KEY = 'ghostIdentityKey';
+// ─── 6. LOCALSTORAGE KEY NAMES ───────────────────────────────
+// All identity data lives in localStorage — nothing is sent to a
+// server.  If these key names change, existing users lose their
+// stored identity, so treat them as a stable public API.
+const DEVICE_STORAGE_KEY   = 'ghostDeviceId';    // unique device ID (generated once per device)
+const PUBLIC_STORAGE_KEY   = 'ghostPublicKey';   // e.g. #ghost-ciphernexus-1042-E
+const PRIVATE_STORAGE_KEY  = 'ghostPrivateKey';  // e.g. @Ghost-Abc1234
+const IDENTITY_STORAGE_KEY = 'ghostIdentityKey'; // combined: publicKey + " " + rawPrivate
 
 // ─── Notification data ────────────────────────────────────────
 const notifications = [
@@ -188,6 +252,14 @@ menuToggle?.addEventListener('click', () => {
   siteNav?.classList.toggle('active');
 });
 
+// ─── 7. KEY GENERATION ───────────────────────────────────────
+// Ghost IDs are generated entirely in the browser — the server
+// never sees them.  The format is:
+//   Public  : #ghost-<codename>-<4digits>-E
+//   Private : @Ghost-<7 alphanumeric chars>
+//   Identity: <publicKey> <raw 7-char private suffix>  (space-separated)
+
+/** Returns a random two-word code name used in the public key. */
 function randomCodeName() {
   const prefixes = ['spirit', 'nova', 'shadow', 'oracle', 'phantom', 'vector', 'spectre', 'cipher', 'echo', 'pulse'];
   const suffixes = ['blade', 'drift', 'flux', 'pulse', 'spark', 'vortex', 'rune', 'wave', 'flare', 'shade'];
@@ -196,12 +268,14 @@ function randomCodeName() {
   return `${prefix}${suffix}`;
 }
 
+/** Generates a unique public address.  Example: #ghost-novablade-3712-E */
 function generatePublicKey() {
   const codeName = randomCodeName();
   const digits = String(Math.floor(Math.random() * 9000) + 1000);
   return `#ghost-${codeName}-${digits}-E`;
 }
 
+/** Generates a private key.  Example: @Ghost-aB3xYzQ */
 function generatePrivateKey() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let key = '@Ghost-';
@@ -211,15 +285,22 @@ function generatePrivateKey() {
   return key;
 }
 
+/**
+ * Combines public + private into one portable identity string.
+ * The user pastes this on another device to restore their identity.
+ * Format: "#ghost-codename-1234-E aB3xYzQ"
+ */
 function generateIdentityKey(publicKey, privateKey) {
-  const rawPrivate = privateKey.replace(/^@Ghost-/, '');
+  const rawPrivate = privateKey.replace(/^@Ghost-/, ''); // strip the prefix — the raw 7 chars are enough
   return `${publicKey} ${rawPrivate}`;
 }
 
+/** Generates a per-device UUID used for session tracking (never shared). */
 function generateDeviceId() {
   if (window.crypto && typeof crypto.randomUUID === 'function') {
     return `device-${crypto.randomUUID()}`;
   }
+  // Fallback for older browsers
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let id = 'device-';
   for (let i = 0; i < 16; i++) {
@@ -228,16 +309,26 @@ function generateDeviceId() {
   return id;
 }
 
+/**
+ * Parses an identity string pasted by the user into its components.
+ * Accepts both "@Ghost-Abc1234" and plain "Abc1234" private key formats.
+ * Returns { publicKey, privateKey } or null if the string is invalid.
+ */
 function parseManualIdentity(value) {
   const trimmed = value.trim();
+  // The public key must match the Ghost ID pattern exactly
   const publicMatch = trimmed.match(/#ghost-[A-Za-z0-9]+-[0-9]{4}-E/);
   if (!publicMatch) return null;
 
   const remainder = trimmed.slice(publicMatch.index + publicMatch[0].length).trim();
+
+  // Try to find a full "@Ghost-Xxx" formatted private key first
   const privateMatch = remainder.match(/@Ghost-[A-Za-z0-9]{7}/);
   if (privateMatch) {
     return { publicKey: publicMatch[0], privateKey: privateMatch[0] };
   }
+
+  // Fall back to bare 7-char alphanumeric string
   const rawMatch = remainder.match(/[A-Za-z0-9]{7}/);
   if (rawMatch) {
     return { publicKey: publicMatch[0], privateKey: `@Ghost-${rawMatch[0]}` };
@@ -277,6 +368,18 @@ function updateLoginKeys() {
   return { publicKey, privateKey, identityKey };
 }
 
+// ─── 8. AVATAR HELPERS ───────────────────────────────────────
+// Every user has a coloured avatar circle generated from their
+// public key.  The colour is deterministic — the same key always
+// produces the same gradient.  If the user uploads a photo, that
+// is layered on top.  Three copies of the avatar exist in the DOM
+// (sidebar, topbar, profile drawer) and must stay in sync.
+
+/**
+ * Derives a deterministic 3-stop radial gradient from a public key.
+ * Converts the key string to a numeric hash, maps it to an HSL hue,
+ * then creates two additional hues spaced 50° and 110° away.
+ */
 function generateAvatarColor(publicKey) {
   const hash = Array.from(publicKey).reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const hue = hash % 360;
@@ -285,58 +388,79 @@ function generateAvatarColor(publicKey) {
   return `radial-gradient(circle at 20% 20%, hsl(${hue}, 85%, 60%), hsl(${secondary}, 75%, 50%) 55%, hsl(${tertiary}, 65%, 40%))`;
 }
 
+/**
+ * Extracts the human-readable alias from a public key string.
+ * e.g. "#ghost-ciphernexus-1042-E" → "Ciphernexus"
+ * Returns "Ghost" if the key doesn't match the expected pattern.
+ */
 function extractAliasFromKey(publicKey) {
-  // e.g. #ghost-ciphernexus-1042-E → "Ciphernexus"
   const match = publicKey.match(/#ghost-([a-z]+)-\d{4}-E/i);
   if (!match) return 'Ghost';
   const raw = match[1];
-  return raw.charAt(0).toUpperCase() + raw.slice(1);
+  return raw.charAt(0).toUpperCase() + raw.slice(1); // capitalise first letter
 }
 
+/**
+ * Returns two-letter initials from the alias portion of a public key.
+ * Used as the fallback inside the avatar circle when no photo is set.
+ */
 function getAvatarInitials(publicKey) {
   const alias = extractAliasFromKey(publicKey);
-  // Take first two chars of alias as initials
   return alias.slice(0, 2).toUpperCase();
 }
 
+/**
+ * Shows a photo in every avatar circle across the app and hides
+ * the initials fallback.  Also updates the upload hint text.
+ */
 function applyPhotoToAllAvatars(dataUrl) {
-  const photoEls = [sidebarPhoto, topbarPhoto, mobileNavPhoto, profileDrawerPhoto];
+  const photoEls    = [sidebarPhoto, topbarPhoto, mobileNavPhoto, profileDrawerPhoto];
   const initialsEls = [sidebarAvatarInitials, topbarAvatarInitials, mobileNavAvatarInitials, profileDrawerAvatarInitials];
 
   photoEls.forEach((img) => {
     if (!img) return;
     img.src = dataUrl;
-    img.classList.remove('hidden');
+    img.classList.remove('hidden'); // make the <img> visible
   });
-  initialsEls.forEach((el) => { if (el) el.classList.add('hidden'); });
+  initialsEls.forEach((el) => { if (el) el.classList.add('hidden'); }); // hide text initials
 
-  // Show remove button, hide hint
+  // Update controls
   if (avatarRemoveBtn) avatarRemoveBtn.classList.remove('hidden');
   if (avatarUploadHint) avatarUploadHint.textContent = 'Tap 📷 to change · ✕ to remove';
 }
 
+/**
+ * Removes any uploaded photo from all avatar circles and falls
+ * back to showing the initials derived from the public key.
+ */
 function clearPhotoFromAllAvatars() {
-  const photoEls = [sidebarPhoto, topbarPhoto, mobileNavPhoto, profileDrawerPhoto];
+  const photoEls    = [sidebarPhoto, topbarPhoto, mobileNavPhoto, profileDrawerPhoto];
   const initialsEls = [sidebarAvatarInitials, topbarAvatarInitials, mobileNavAvatarInitials, profileDrawerAvatarInitials];
 
   photoEls.forEach((img) => {
     if (!img) return;
     img.src = '';
-    img.classList.add('hidden');
+    img.classList.add('hidden'); // hide the <img>
   });
-  initialsEls.forEach((el) => { if (el) el.classList.remove('hidden'); });
+  initialsEls.forEach((el) => { if (el) el.classList.remove('hidden'); }); // show text initials back
 
   if (avatarRemoveBtn) avatarRemoveBtn.classList.add('hidden');
   if (avatarUploadHint) avatarUploadHint.textContent = 'Tap 📷 to set a photo';
 }
 
+/**
+ * Master avatar sync function.  Call this any time the identity
+ * changes.  It sets the gradient background on every circle,
+ * updates the initials text, and re-applies a saved photo if one
+ * exists in localStorage.
+ */
 function applyAvatar(publicKey) {
   const gradient = generateAvatarColor(publicKey);
-  const initials = getAvatarInitials(publicKey);
-  const alias = extractAliasFromKey(publicKey);
+  const initials  = getAvatarInitials(publicKey);
+  const alias     = extractAliasFromKey(publicKey);
 
-  // Apply gradient + initials to all circles
-  const circles = [sidebarAvatar, topbarAvatar, mobileNavAvatar, profileDrawerAvatar];
+  // Update every avatar circle's background gradient
+  const circles     = [sidebarAvatar, topbarAvatar, mobileNavAvatar, profileDrawerAvatar];
   const initialsEls = [sidebarAvatarInitials, topbarAvatarInitials, mobileNavAvatarInitials, profileDrawerAvatarInitials];
 
   circles.forEach((el) => { if (el) el.style.background = gradient; });
@@ -347,7 +471,7 @@ function applyAvatar(publicKey) {
     }
   });
 
-  // If a saved photo exists, layer it on top of the gradient
+  // Re-apply uploaded photo if one was saved (it overlays the gradient)
   const savedPhoto = localStorage.getItem(AVATAR_PHOTO_KEY);
   if (savedPhoto) {
     applyPhotoToAllAvatars(savedPhoto);
@@ -365,12 +489,17 @@ function applyAvatar(publicKey) {
   if (profileIdentityDisplay) profileIdentityDisplay.classList.remove('revealed');
 }
 
+/**
+ * Reads an image File, shrinks it to fit within 256×256, encodes it
+ * as JPEG at 88% quality, saves to localStorage, and updates all avatars.
+ * We cap size to 256×256 because localStorage has a 5 MB quota.
+ */
 function resizeAndStorePhoto(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
     const img = new Image();
     img.onload = () => {
-      // Resize to max 256×256 to keep localStorage size small
+      // Never upscale — Math.min(…, 1) clamps scale factor to ≤1
       const MAX = 256;
       const canvas = document.createElement('canvas');
       const scale = Math.min(MAX / img.width, MAX / img.height, 1);
@@ -387,6 +516,11 @@ function resizeAndStorePhoto(file) {
   reader.readAsDataURL(file);
 }
 
+/**
+ * Writes all four identity values to localStorage.
+ * The device ID is only generated once — if one already exists we
+ * reuse it so the device's identity stays stable across logins.
+ */
 function saveIdentityToStorage(publicKey, privateKey, identityKey) {
   const existingDeviceId = localStorage.getItem(DEVICE_STORAGE_KEY) || generateDeviceId();
   localStorage.setItem(DEVICE_STORAGE_KEY, existingDeviceId);
@@ -395,6 +529,11 @@ function saveIdentityToStorage(publicKey, privateKey, identityKey) {
   localStorage.setItem(IDENTITY_STORAGE_KEY, identityKey);
 }
 
+/**
+ * Populates every identity-dependent element in the app with the
+ * supplied keys, then applies the avatar.  Called after login or
+ * identity restore.
+ */
 function loadAppWithKeys(publicKey, privateKey) {
   const identityKey = generateIdentityKey(publicKey, privateKey);
   if (accountPublicKey) accountPublicKey.textContent = publicKey;
@@ -414,7 +553,14 @@ function loadAppWithKeys(publicKey, privateKey) {
   }
 }
 
+// ─── 9. VIEW MANAGEMENT ──────────────────────────────────────
+
+/**
+ * Hides the landing page and login overlay; shows the app shell.
+ * Called once the user has confirmed their identity.
+ */
 function showAppScreen() {
+  // Hide all top-level <section> tags except #appShell
   document.querySelectorAll('main > section').forEach((section) => {
     if (section.id === 'appShell') {
       section.classList.remove('hidden');
@@ -427,27 +573,40 @@ function showAppScreen() {
     loginOverlay.classList.remove('active');
     loginOverlay.setAttribute('aria-hidden', 'true');
   }
-  document.body.classList.remove('no-scroll');
-  switchAppView('chat');
+  document.body.classList.remove('no-scroll'); // restore scrolling (was locked during overlay)
+  switchAppView('chat'); // always start in the chat view
   renderChatList();
 }
 
+// ─── 10. CHAT LIST & DETAIL ──────────────────────────────────
+
+/**
+ * Returns the subset of chatData that matches the active filter
+ * (all / unread / requests) AND the current search query.
+ */
 function getChatList() {
   return chatData.filter((chat) => {
     if (activeFilter === 'unread' && chat.unread <= 0) return false;
     if (activeFilter === 'requests' && chat.category !== 'request') return false;
     const query = chatSearchQuery.trim().toLowerCase();
     if (!query) return true;
+    // Search across contact name, public key, and last message preview
     return [chat.name, chat.publicKey, chat.lastMessage].some((value) =>
       value.toLowerCase().includes(query)
     );
   });
 }
 
+/**
+ * Opens a conversation and shows the chat detail panel.
+ * On narrow screens (< 980 px) the chat list slides out of view;
+ * on wide screens both list and detail panel are visible side-by-side.
+ */
 function openChatDetail(chatId) {
   activeChatId = chatId;
   renderChatDetail();
 
+  // Reveal the compose bar now that a chat is open
   if (messageInputArea) {
     messageInputArea.classList.remove('hidden');
     messageInputArea.classList.remove('compact');
@@ -455,13 +614,16 @@ function openChatDetail(chatId) {
   }
 
   if (window.innerWidth < 980) {
+    // Mobile: slide the detail panel in and hide the list behind it
     chatDetailPanel?.classList.add('show');
     chatListElement?.classList.add('hidden');
   } else {
+    // Desktop: simply unhide the detail panel
     chatDetailPanel?.classList.remove('hidden');
   }
 }
 
+/** Closes the chat detail panel and returns to the list (mobile only). */
 function closeChatDetail() {
   if (window.innerWidth < 980) {
     chatDetailPanel?.classList.remove('show');
@@ -471,6 +633,12 @@ function closeChatDetail() {
   }
 }
 
+/**
+ * Builds the chat list HTML from filteredChats and injects it into
+ * #chatList.  Unread-badge numbers are shown as coloured chips.
+ * Attaches click listeners to open each conversation.
+ * Also auto-opens the first chat on desktop if nothing is active.
+ */
 function renderChatList() {
   if (!chatListElement) return;
   const filteredChats = getChatList();
@@ -544,6 +712,15 @@ function renderChatDetail() {
   renderChatList();
 }
 
+// ─── 11. APP VIEW SWITCHING ──────────────────────────────────
+
+/**
+ * Shows the requested view panel and hides all others.
+ * Updates the active-state highlight on both sidebar icons and
+ * the mobile bottom-nav buttons.
+ *
+ * @param {string} view - One of 'chat' | 'ghosttime' | 'terminal' | 'account'
+ */
 function switchAppView(view) {
   if (chatView) chatView.classList.toggle('hidden', view !== 'chat');
   if (ghosttimeView) ghosttimeView.classList.toggle('hidden', view !== 'ghosttime');
@@ -577,6 +754,13 @@ function switchAppView(view) {
   if (messageInputArea) messageInputArea.classList.add('hidden');
 }
 
+// ─── 12. GHOSTTIME (SOCIAL FEED) ─────────────────────────────
+
+/**
+ * Renders the GhostTime post cards into #gtPostList.
+ * Each card shows the publisher, post preview, and a "View" button
+ * that opens the full post detail in the chat-detail panel.
+ */
 function renderGtPosts() {
   if (!gtPostList) return;
   gtPostList.innerHTML = gtPosts
@@ -606,6 +790,7 @@ function renderGtPosts() {
   });
 }
 
+/** Re-renders the comment list for a given post into its #gtComments-{id} container. */
 function renderComments(postId) {
   const comments = gtComments[postId] || [];
   const container = document.getElementById(`gtComments-${postId}`);
@@ -619,6 +804,14 @@ function renderComments(postId) {
   `).join('');
 }
 
+/**
+ * Opens the full-detail view of a GhostTime post inside the chat
+ * detail panel.  Increments the view counter, renders comments,
+ * wires the like / comment toggle buttons, and shows "More from
+ * <publisher>" cards at the bottom.
+ * Note: the outer .message-input-area is hidden here — GhostTime
+ * uses inline comment boxes instead.
+ */
 function openGtPostDetail(postId) {
   const post = gtPosts.find(p => p.id === postId);
   if (!post) return;
@@ -703,6 +896,12 @@ function openGtPostDetail(postId) {
   }
 }
 
+/**
+ * Reads the GhostTime compose textarea, creates a new post object,
+ * prepends it to the gtPosts array, clears the textarea, and
+ * refreshes the post feed.  The publisher name is derived from the
+ * logged-in user's public key alias.
+ */
 function handlePublishGtPost() {
   if (!gtPostText) return;
   const content = gtPostText.value.trim();
@@ -722,14 +921,23 @@ function handlePublishGtPost() {
   renderGtPosts();
 }
 
+// ─── 13. SEARCH & CONTACTS ───────────────────────────────────
+
+/** Updates the search query state and re-renders the filtered chat list. */
 function handleSearchInput(event) {
   chatSearchQuery = event.target.value || '';
   renderChatList();
 }
 
+/**
+ * Prompts the user for a friend's public key or name, synthesises a
+ * chat entry, adds it as a contact request, and switches to the
+ * Requests filter so the new entry is visible immediately.
+ */
 function handleAddFriend() {
   const input = prompt('Add a friend by public key or name:');
   if (!input) return;
+  // Accept a raw "#ghost-…" key or turn a plain name into a placeholder key
   const publicKey = input.trim().startsWith('#ghost-') ? input.trim() : `#ghost-${input.replace(/\s+/g, '').toLowerCase()}-0000-E`;
   const newChat = {
     id: `chat-${Date.now()}`,
@@ -746,6 +954,14 @@ function handleAddFriend() {
   renderChatList();
 }
 
+// ─── 14. MESSAGING ───────────────────────────────────────────
+
+/**
+ * Sends the message currently typed in the compose bar.
+ * Appends it to the active chat's message array (client-side only),
+ * updates the lastMessage preview in the list, clears the input,
+ * and re-renders both the detail and the list panel.
+ */
 function handleSendMessage() {
   if (!messageInput) return;
   const text = messageInput.value.trim();
@@ -754,33 +970,51 @@ function handleSendMessage() {
   const chat = chatData.find((item) => item.id === activeChatId);
   if (!chat) return;
   const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  chat.messages.push({ sender: 'me', text, time });
-  chat.lastMessage = text;
+  chat.messages.push({ sender: 'me', text, time }); // add to in-memory array
+  chat.lastMessage = text;                           // update list preview
   chat.time = 'Now';
   messageInput.value = '';
   renderChatDetail();
   renderChatList();
 }
 
+// ─── 15. APP INITIALISATION ──────────────────────────────────
+
+/**
+ * Checks localStorage for an existing identity on page load.
+ * If keys are found the user is taken directly into the app
+ * without seeing the login overlay again.
+ */
 function initializeApp() {
-  const storedDeviceId = localStorage.getItem(DEVICE_STORAGE_KEY);
+  const storedDeviceId  = localStorage.getItem(DEVICE_STORAGE_KEY);
   const storedPublicKey = localStorage.getItem(PUBLIC_STORAGE_KEY);
   const storedPrivateKey = localStorage.getItem(PRIVATE_STORAGE_KEY);
 
+  // All three must exist for the session to be considered valid
   if (storedDeviceId && storedPublicKey && storedPrivateKey) {
     loadAppWithKeys(storedPublicKey, storedPrivateKey);
     showAppScreen();
   }
 }
 
+// ─── 16. LOGIN OVERLAY ───────────────────────────────────────
+
+/**
+ * Opens the identity/login overlay, generates fresh key proposals,
+ * and locks the page scroll behind the modal.
+ */
 function showLoginOverlay() {
   if (!loginOverlay) return;
-  updateLoginKeys();
+  updateLoginKeys(); // generates new public/private/identity keys and populates the UI
   loginOverlay.classList.add('active');
   loginOverlay.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('no-scroll');
+  document.body.classList.add('no-scroll'); // prevent background scroll
 }
 
+/**
+ * Handles the "Use existing identity" flow.
+ * Parses the pasted identity string, saves keys, and enters the app.
+ */
 function handleManualIdentity() {
   if (!manualIdentityInput) return;
   const parsed = parseManualIdentity(manualIdentityInput.value);
@@ -796,6 +1030,12 @@ function handleManualIdentity() {
   showAppScreen();
 }
 
+// ─── 17. CLIPBOARD HELPER ────────────────────────────────────
+
+/**
+ * Copies text to the system clipboard using the Clipboard API.
+ * Falls back to an alert if the API is unavailable (non-HTTPS).
+ */
 function copyText(text) {
   if (!navigator.clipboard) {
     alert('Clipboard API is unavailable in this browser.');
@@ -987,32 +1227,67 @@ if (bldExitBtn) {
   });
 }
 
-// ─── Terminal root-mode state ─────────────────────────────────
-let terminalRootAuthenticated = false;
-let terminalAwaitingAlias = false;
-let terminalPendingCmd = null;
-let terminalBldMode = false;
-let terminalLastRecipient = null;
+// ─── 18. TERMINAL / @GHOST ROOT SYSTEM ──────────────────────
+// The terminal view exposes two command sets:
+//   • Standard: "ghost <cmd>" — routed to the FastAPI backend
+//   • Root:     "@ghost <cmd>" — privileged; require alias auth first
+//
+// Root authentication flow:
+//   1. User types "@ghost <cmd>"
+//   2. Terminal switches input to password mode, asks for the alias
+//   3. verifyRootAlias() compares input against extractAliasFromKey(storedPublicKey)
+//   4. On success, terminalRootAuthenticated = true and the original command is dispatched
+//   5. The flag persists for the current page session (cleared on "ghost clear")
+//
+// BLD mode: a fullscreen overlay on the terminal activated by "@ghost bld".
+// It adds the class "terminal-bld-active" to <body> and shows a sticky banner.
 
+/** Persistent terminal state (lives for the duration of the page session). */
+let terminalRootAuthenticated = false; // true once alias auth passes
+let terminalAwaitingAlias     = false; // true while waiting for alias input
+let terminalPendingCmd        = null;  // the @ghost command stored during auth
+let terminalBldMode           = false; // true when BLD fullscreen is active
+let terminalLastRecipient     = null;  // public key of the last @ghost send target
+
+/**
+ * Masks all but the last 3 chars of a private key for display.
+ * e.g. "@Ghost-aB3xYzQ" → "@Ghost-●●●YzQ"
+ */
 function maskPrivateKey(pk) {
   if (!pk) return '@Ghost-●●●●●●●';
   const raw = pk.replace('@Ghost-', '');
   return `@Ghost-●●●${raw.slice(-3)}`;
 }
 
+/**
+ * Appends a single line to the terminal output element.
+ * @param {string} text  - The line text to show.
+ * @param {string} type  - CSS modifier class: 'output'|'command'|'root'|'error'|'warn'|'success'
+ */
 function appendTerminalLine(text, type = 'output') {
   if (!terminalOutput) return;
   const line = document.createElement('div');
   line.className = `terminal-line ${type}`;
   line.textContent = text;
   terminalOutput.appendChild(line);
-  terminalOutput.scrollTop = terminalOutput.scrollHeight;
+  terminalOutput.scrollTop = terminalOutput.scrollHeight; // auto-scroll to bottom
 }
 
+/** Appends multiple output lines from an array (e.g. a server response). */
 function appendTerminalLines(lines) {
   lines.forEach((line) => appendTerminalLine(line, 'output'));
 }
 
+/**
+ * Renders a styled message bubble in the terminal (sent or received).
+ * If direction is 'sent', a simulated reply arrives after ~2 s.
+ *
+ * @param {'sent'|'recv'} direction
+ * @param {string} senderLabel - Display name (alias) of the remote party
+ * @param {string} senderKey   - Masked public/private key for the meta row
+ * @param {string} text        - The message body
+ * @param {string} time        - Formatted time string (HH:MM)
+ */
 function appendTerminalMessage(direction, senderLabel, senderKey, text, time) {
   if (!terminalOutput) return;
   const div = document.createElement('div');
@@ -1044,13 +1319,19 @@ function appendTerminalMessage(direction, senderLabel, senderKey, text, time) {
   }
 }
 
+/**
+ * Activates or deactivates BLD (BlackLight Display) fullscreen mode.
+ * When on=true: adds 'terminal-bld-active' to <body>, shows the BLD
+ * banner and exit button, and auto-switches to the terminal view.
+ * When on=false: reverses all of the above.
+ */
 function setBldMode(on) {
   terminalBldMode = on;
   const termPanel = document.querySelector('.terminal-panel');
   const bldBanner = document.getElementById('bldBanner');
   const bldExitBtn = document.getElementById('bldExitBtn');
   if (on) {
-    document.body.classList.add('terminal-bld-active');
+    document.body.classList.add('terminal-bld-active'); // CSS makes terminal cover full viewport
     if (bldBanner) bldBanner.classList.remove('hidden');
     if (bldExitBtn) bldExitBtn.classList.remove('hidden');
     // Also switch to terminal view
@@ -1064,11 +1345,16 @@ function setBldMode(on) {
   }
 }
 
+/**
+ * Begins the alias-authentication challenge for a root @ghost command.
+ * Stores the pending command string, switches the input to password type
+ * (so the alias is not visible on screen), and prompts the user.
+ */
 function initiateRootAuth(cmd) {
   terminalAwaitingAlias = true;
   terminalPendingCmd = cmd;
   if (terminalInput) {
-    terminalInput.type = 'password';
+    terminalInput.type = 'password';    // hide alias as it is typed
     terminalInput.placeholder = 'enter your alias…';
   }
   appendTerminalLine('', 'output');
@@ -1077,6 +1363,11 @@ function initiateRootAuth(cmd) {
   appendTerminalLine('  Tip: your alias is the codename in your Ghost ID.', 'output');
 }
 
+/**
+ * Validates the alias typed by the user against the alias extracted
+ * from the stored public key.  On success, sets terminalRootAuthenticated
+ * and dispatches the stored pending command.  On failure, clears the queue.
+ */
 function verifyRootAlias(input) {
   if (terminalInput) {
     terminalInput.type = 'text';
@@ -1112,12 +1403,21 @@ function verifyRootAlias(input) {
   }
 }
 
+/**
+ * Dispatches an authenticated @ghost root command.
+ * Handles the "bld exit" shortcut on the frontend, then routes
+ * everything else to the backend.  Interprets special status codes
+ * returned by the API (bld_active, bld_exit, send_msg) and renders
+ * them appropriately in the terminal output.
+ *
+ * @param {string} raw - The full raw command string the user typed.
+ */
 async function dispatchAtGhostCommand(raw) {
   const storedPriv = localStorage.getItem(PRIVATE_STORAGE_KEY) || '';
   const maskedKey = maskPrivateKey(storedPriv);
   const publicId = localStorage.getItem(PUBLIC_STORAGE_KEY) || '';
 
-  // ── BLD exit (frontend-only) ───────────────────────────────
+  // ── BLD exit (frontend-only shortcut, no API call needed) ─
   const cmdLow = raw.toLowerCase();
   if (cmdLow.includes('bld exit') || cmdLow === '@ghost exit') {
     setBldMode(false);
@@ -1160,6 +1460,13 @@ async function dispatchAtGhostCommand(raw) {
   appendTerminalLine('', 'output');
 }
 
+/**
+ * POSTs a terminal command to the FastAPI backend at /api/terminal.
+ * Returns the parsed JSON response, or null on failure (error is printed).
+ *
+ * Request body: { command: string, public_id?: string }
+ * Response: { status: string, output: string[], clear?: bool, extra?: object }
+ */
 async function callTerminalApi(command, publicId) {
   try {
     const response = await fetch('/api/terminal', {
@@ -1244,31 +1551,42 @@ contactForm?.addEventListener('submit', (event) => {
   }
 });
 
-// ─── Profile Drawer ───────────────────────────────────────────
+// ─── 19. PROFILE DRAWER ──────────────────────────────────────
+// The profile drawer slides in from the right edge of the screen.
+// It shows the user's alias, public key, private key (masked), and
+// a combined identity key (masked).  The user can reveal, copy, or
+// change their avatar photo from here.
+
+/**
+ * Opens the profile drawer.  Re-reads identity from localStorage so
+ * the display is always up-to-date even if keys were refreshed.
+ * The identity key starts masked (••••) and is only revealed on demand.
+ */
 function openProfileDrawer() {
   if (!profileDrawer || !profileDrawerOverlay) return;
 
-  // Refresh identity display from storage each time we open
+  // Always pull fresh from storage so the display reflects any changes
   const storedIdentity = localStorage.getItem(IDENTITY_STORAGE_KEY) || '';
   profileKeyRevealed = false;
   if (profileIdentityDisplay) {
-    profileIdentityDisplay.textContent = '••••••••••••••••••••';
+    profileIdentityDisplay.textContent = '••••••••••••••••••••'; // masked by default
     profileIdentityDisplay.classList.remove('revealed');
-    profileIdentityDisplay.dataset.full = storedIdentity;
+    profileIdentityDisplay.dataset.full = storedIdentity;       // stash real value in data attr
   }
 
   profileDrawerOverlay.classList.add('open');
   profileDrawerOverlay.setAttribute('aria-hidden', 'false');
   profileDrawer.classList.add('open');
-  document.body.style.overflow = 'hidden';
+  document.body.style.overflow = 'hidden'; // lock scroll while drawer is open
 }
 
+/** Closes the profile drawer and restores page scrolling. */
 function closeProfileDrawer() {
   if (!profileDrawer || !profileDrawerOverlay) return;
   profileDrawer.classList.remove('open');
   profileDrawerOverlay.classList.remove('open');
   profileDrawerOverlay.setAttribute('aria-hidden', 'true');
-  document.body.style.overflow = '';
+  document.body.style.overflow = ''; // restore scroll
 }
 
 sidebarProfileBtn?.addEventListener('click', openProfileDrawer);
@@ -1308,9 +1626,12 @@ profileLogoutBtn?.addEventListener('click', () => {
   location.reload();
 });
 
-// ─── Avatar upload / remove ───────────────────────────────────
+// ─── 20. AVATAR UPLOAD / REMOVE ──────────────────────────────
+// The hidden <input type="file"> is triggered programmatically by
+// the camera button.  After selection we resize + store the image.
+
 avatarUploadBtn?.addEventListener('click', () => {
-  avatarFileInput?.click();
+  avatarFileInput?.click(); // open the native file picker
 });
 
 avatarFileInput?.addEventListener('change', (e) => {
@@ -1321,16 +1642,16 @@ avatarFileInput?.addEventListener('change', (e) => {
     return;
   }
   resizeAndStorePhoto(file);
-  // Reset input so the same file can be re-selected if needed
-  avatarFileInput.value = '';
+  avatarFileInput.value = ''; // reset so the same file can be re-selected
 });
 
 avatarRemoveBtn?.addEventListener('click', () => {
-  localStorage.removeItem(AVATAR_PHOTO_KEY);
-  clearPhotoFromAllAvatars();
+  localStorage.removeItem(AVATAR_PHOTO_KEY); // clear from storage
+  clearPhotoFromAllAvatars();                // revert to initials
 });
 
-// Close drawer with Escape key
+// ─── 21. GLOBAL KEYBOARD SHORTCUTS ───────────────────────────
+// Escape closes the profile drawer or notification dropdown.
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (profileDrawer?.classList.contains('open')) closeProfileDrawer();
@@ -1338,9 +1659,13 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ─── Nav links: scroll to section (even from app shell) ──────
+// ─── 22. NAV LINKS → SECTION SCROLL ─────────────────────────
+/**
+ * Scrolls to a landing-page section by ID.
+ * If the app shell is currently visible, hides it first and
+ * restores the landing page sections, then smooth-scrolls.
+ */
 function navigateToSection(sectionId) {
-  // If app shell is visible, switch back to landing view first
   const shell = document.getElementById('appShell');
   const isShellVisible = shell && !shell.classList.contains('hidden');
 
@@ -1375,7 +1700,14 @@ document.querySelector('.brand')?.addEventListener('click', (e) => {
   navigateToSection('home');
 });
 
-// ─── Notifications ────────────────────────────────────────────
+// ─── 23. NOTIFICATIONS ───────────────────────────────────────
+// The notification bell shows a badge count of unread items.
+// Clicking opens a dropdown list; each item marks itself read on click.
+
+/**
+ * Updates the badge number on the notification bell icon.
+ * Hides the badge entirely when all notifications are read.
+ */
 function updateBadge() {
   const unreadCount = notifications.filter((n) => n.unread).length;
   if (!notifBadge) return;
@@ -1389,6 +1721,7 @@ function updateBadge() {
   }
 }
 
+/** Renders all notification items into the #notifList element. */
 function renderNotifications() {
   if (!notifList) return;
   if (notifications.length === 0) {
@@ -1457,10 +1790,14 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// ─── Highlight active nav link on scroll ─────────────────────
+// ─── 24. ACTIVE NAV LINK ON SCROLL ───────────────────────────
+// As the user scrolls the landing page, we highlight the nav link
+// that corresponds to the section currently in view.
 const landingSections = ['home', 'features', 'architecture', 'security', 'contact'];
+
+/** Determines which landing section is in view and marks its nav link active. */
 function updateActiveNavLink() {
-  const scrollY = window.scrollY + 100;
+  const scrollY = window.scrollY + 100; // +100 px offset so the link activates slightly before the section top
   let current = 'home';
   landingSections.forEach((id) => {
     const el = document.getElementById(id);
@@ -1470,8 +1807,13 @@ function updateActiveNavLink() {
     link.classList.toggle('active', link.dataset.section === current);
   });
 }
-window.addEventListener('scroll', updateActiveNavLink, { passive: true });
+window.addEventListener('scroll', updateActiveNavLink, { passive: true }); // passive = no janky scroll
 
+// ─── 25. STARTUP ─────────────────────────────────────────────
+// DOMContentLoaded fires once the HTML is fully parsed.
+// We update the notification badge and run initializeApp() which
+// checks localStorage — if keys exist, the user goes straight into
+// the app; otherwise the landing page is shown.
 window.addEventListener('DOMContentLoaded', () => {
   updateBadge();
   updateActiveNavLink();
