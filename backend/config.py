@@ -2,7 +2,6 @@ import re
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
-
 class Settings(BaseSettings):
     PROJECT_NAME: str = "GhostTunn"
     DATABASE_URL: str = Field("sqlite+aiosqlite:///./ghosttunn.db", env="DATABASE_URL")

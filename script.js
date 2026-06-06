@@ -30,8 +30,8 @@
   if (!splash) return;
   setTimeout(() => {
     splash.classList.add('fade-out');           // triggers CSS opacity → 0 transition
-    setTimeout(() => splash.remove(), 750);    // remove after transition finishes
-  }, 2200);
+    setTimeout(() => splash.remove(), 10000);    // remove after transition finishes
+  }, 10000);
 })();
 
 

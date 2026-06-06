@@ -708,7 +708,7 @@ h2 {
 }
 
 .contact-form input::placeholder {
-  color: rgba(255,255,255,0.5);
+  color: rgba(62, 87, 198, 0.5);
 }
 
 .form-note {
@@ -745,11 +745,16 @@ h2 {
 
 .login-card {
   width: min(960px, 100%);
+  height: 1000px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: linear-gradient(180deg, rgba(8, 23, 62, 0.95), rgba(4, 11, 25, 0.98));
   border: 1px solid rgba(93, 140, 255, 0.18);
   border-radius: 32px;
   box-shadow: 0 0 120px rgba(84, 139, 255, 0.18);
   padding: 2.5rem;
+  padding-bottom: 200px;
+  padding-top: 200px;
 }
 
 .login-title {
@@ -771,7 +776,7 @@ h2 {
 
 .glow-text {
   background: linear-gradient(90deg, #5d8cff, #79ffff, #e26bff, #4b95ff);
-  -webkit-background-clip: text;
+  webkit-background-clip: text;
   color: transparent;
   animation: neon-glow 3.5s ease-in-out infinite;
 }
@@ -2514,7 +2519,7 @@ body.terminal-bld-active .mobile-bottom-nav {
   min-height: calc(100vh - 140px);
 }
 
-..chat-detail-panel {
+.chat-detail-panel {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -3389,7 +3394,7 @@ body.terminal-bld-active .mobile-bottom-nav {
   .login-card {
     padding: 1.5rem;
     border-radius: 14px;
-    max-height: 96vh;
+    max-height: 90vh;
     overflow-y: auto;
   }
 
