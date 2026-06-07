@@ -776,7 +776,7 @@ h2 {
 
 .glow-text {
   background: linear-gradient(90deg, #5d8cff, #79ffff, #e26bff, #4b95ff);
-  webkit-background-clip: text;
+  -webkit-background-clip: text;
   color: transparent;
   animation: neon-glow 3.5s ease-in-out infinite;
 }
