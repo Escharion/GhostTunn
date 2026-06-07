@@ -18,6 +18,14 @@ class IdentityCreateResponse(BaseModel):
     created_at: datetime
 
 
+class IdentityRecoverResponse(BaseModel):
+    public_id: str
+    private_id: str
+    alias: str
+    avatar: str
+    created_at: datetime
+
+
 class PostCreate(BaseModel):
     author_public_id: str
     content: str = Field(..., min_length=1, max_length=280)
@@ -35,9 +43,10 @@ class PostResponse(BaseModel):
     comments: int
     reposts: int
     created_at: datetime
+    liked: bool = False
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ChatCreate(BaseModel):
@@ -61,7 +70,7 @@ class MessageResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class NotificationResponse(BaseModel):
@@ -72,4 +81,4 @@ class NotificationResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True

@@ -22,7 +22,26 @@
       <p class="eyebrow">Welcome</p>
       <h1>Anonymous social messaging reimagined.</h1>
       <p><span class="logo-ring logo-ring--inline" aria-hidden="true"></span>GhostTunn launches your private identity and secure GhostTime feed without email or phone number.</p>
-      <button class="btn btn-primary" id="welcomeContinue">Continue</button>
+      <div class="welcome-actions">
+        <button class="btn btn-primary" id="welcomeContinue">Create Identity</button>
+        <button class="btn btn-secondary" id="welcomeRecover">Login with Key</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="recoverScreen" class="screen screen--welcome hidden">
+    <div class="welcome-panel">
+      <p class="eyebrow">Identity Recovery</p>
+      <h2>Enter your private identity key to restore access.</h2>
+      <p>Your private key looks like: <code>#ghost-XXX-0000-EH-EV-E01</code></p>
+      <div class="recover-form">
+        <input type="text" id="recoverKeyInput" placeholder="#ghost-XXX-0000-EH-EV-E01" autocomplete="off" spellcheck="false" />
+        <p id="recoverError" class="recover-error hidden">Identity not found. Double-check your key.</p>
+        <div class="identity-actions">
+          <button class="btn btn-neon" id="recoverSubmit">Recover Identity</button>
+          <button class="btn btn-secondary" id="recoverBack">Back</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -67,7 +86,7 @@
         </div>
       </div>
       <div class="search-block">
-        <input id="globalSearch" type="search" placeholder="Search public IDs, posts, friends..." />
+        <input id="globalSearch" type="search" placeholder="Search public IDs, posts..." />
       </div>
     </div>
 
@@ -92,7 +111,14 @@
       </section>
 
       <section id="chatsView" class="content-view hidden">
-        <div class="section-title"><h2>Chats</h2><p>Your private message list.</p></div>
+        <div class="section-title">
+          <h2>Chats</h2>
+          <p>Your private message list.</p>
+        </div>
+        <div class="new-chat-row">
+          <input type="text" id="newChatInput" placeholder="Enter Ghost Public ID to start chat (@Ghost-...)" />
+          <button class="btn btn-primary" id="newChatBtn">Open Chat</button>
+        </div>
         <div id="chatList" class="chat-list"></div>
       </section>
 
@@ -104,6 +130,24 @@
       <section id="notificationsView" class="content-view hidden">
         <div class="section-title"><h2>Notifications</h2><p>Social, connection, and system alerts.</p></div>
         <div id="notificationsList" class="notification-list"></div>
+      </section>
+
+      <section id="terminalView" class="content-view hidden">
+        <div class="terminal-shell">
+          <div class="terminal-header">
+            <span class="terminal-dot terminal-dot--red"></span>
+            <span class="terminal-dot terminal-dot--yellow"></span>
+            <span class="terminal-dot terminal-dot--green"></span>
+            <span class="terminal-title">GhostTunn Shell</span>
+          </div>
+          <div class="terminal-output" id="terminalOutput">
+            <div class="terminal-line terminal-line--system">GhostTunn Shell v1.0 — type <span class="terminal-cmd">ghost help</span> to begin</div>
+          </div>
+          <div class="terminal-input-row">
+            <span class="terminal-prompt">ghost@tunn:~$</span>
+            <input type="text" id="terminalInput" class="terminal-input" placeholder="ghost help" autocomplete="off" spellcheck="false" />
+          </div>
+        </div>
       </section>
 
       <section id="accountView" class="content-view hidden">
@@ -123,6 +167,7 @@
           </div>
           <div class="account-actions">
             <button class="btn btn-secondary" id="revealPrivate">Reveal Private ID</button>
+            <button class="btn btn-secondary" id="copyPrivate">Copy Key</button>
             <button class="btn btn-secondary" id="resetIdentity">Reset Identity</button>
           </div>
         </div>
@@ -130,12 +175,31 @@
     </div>
 
     <nav class="bottom-nav">
-      <button class="nav-item nav-item--active" data-target="homeView">Home</button>
-      <button class="nav-item" data-target="chatsView">Chats</button>
-      <button class="nav-item" data-target="idsView">IDs</button>
-      <button class="nav-item" data-target="notificationsView">Alerts</button>
-      <button class="nav-item" data-target="accountView">Account</button>
+      <button class="nav-item nav-item--active" data-target="homeView">🏠 Home</button>
+      <button class="nav-item" data-target="chatsView">💬 Chats</button>
+      <button class="nav-item" data-target="idsView">🆔 IDs</button>
+      <button class="nav-item" data-target="terminalView">⌨️ Shell</button>
+      <button class="nav-item" data-target="accountView">👤 Account</button>
     </nav>
+  </div>
+
+  <!-- Chat Room Overlay -->
+  <div id="chatRoomOverlay" class="chat-room-overlay hidden">
+    <div class="chat-room-header">
+      <button class="chat-back-btn" id="chatBackBtn">← Back</button>
+      <div class="chat-room-identity">
+        <span class="chat-room-avatar" id="chatRoomAvatar">👻</span>
+        <div>
+          <strong id="chatRoomName">@Ghost-...</strong>
+          <span class="chat-room-status" id="chatRoomStatus">Online</span>
+        </div>
+      </div>
+    </div>
+    <div class="chat-room-messages" id="chatRoomMessages"></div>
+    <div class="chat-room-input-bar">
+      <textarea id="chatRoomInput" class="chat-room-textarea" rows="1" placeholder="Type a message..."></textarea>
+      <button class="chat-send-btn" id="chatSendBtn">➤</button>
+    </div>
   </div>
 
   <script src="/static/script.js"></script>
