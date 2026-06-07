@@ -1,6 +1,7 @@
 const screens = {
   splash: document.getElementById('splashScreen'),
   welcome: document.getElementById('welcomeScreen'),
+  recover: document.getElementById('recoverScreen'),
   identity: document.getElementById('identityScreen'),
   app: document.getElementById('appShell'),
 };
@@ -10,12 +11,19 @@ const privateIdValue = document.getElementById('privateIdValue');
 const avatarGrid = document.getElementById('avatarGrid');
 const saveIdentityButton = document.getElementById('saveIdentity');
 const welcomeContinue = document.getElementById('welcomeContinue');
+const welcomeRecover = document.getElementById('welcomeRecover');
 const identityBack = document.getElementById('identityBack');
+const recoverBack = document.getElementById('recoverBack');
+const recoverSubmit = document.getElementById('recoverSubmit');
+const recoverKeyInput = document.getElementById('recoverKeyInput');
+const recoverError = document.getElementById('recoverError');
 const postForm = document.getElementById('postForm');
 const postInput = document.getElementById('postInput');
 const charCount = document.getElementById('charCount');
 const feedList = document.getElementById('feedList');
 const chatList = document.getElementById('chatList');
+const newChatInput = document.getElementById('newChatInput');
+const newChatBtn = document.getElementById('newChatBtn');
 const idConnections = document.getElementById('idConnections');
 const notificationsList = document.getElementById('notificationsList');
 const accountPublicId = document.getElementById('accountPublicId');
@@ -25,10 +33,23 @@ const accountJoined = document.getElementById('accountJoined');
 const accountPosts = document.getElementById('accountPosts');
 const accountConnections = document.getElementById('accountConnections');
 const revealPrivate = document.getElementById('revealPrivate');
+const copyPrivate = document.getElementById('copyPrivate');
 const resetIdentity = document.getElementById('resetIdentity');
 const navItems = Array.from(document.querySelectorAll('.nav-item'));
 const views = Array.from(document.querySelectorAll('.content-view'));
 const globalSearch = document.getElementById('globalSearch');
+
+const terminalInput = document.getElementById('terminalInput');
+const terminalOutput = document.getElementById('terminalOutput');
+
+const chatRoomOverlay = document.getElementById('chatRoomOverlay');
+const chatBackBtn = document.getElementById('chatBackBtn');
+const chatRoomMessages = document.getElementById('chatRoomMessages');
+const chatRoomInput = document.getElementById('chatRoomInput');
+const chatSendBtn = document.getElementById('chatSendBtn');
+const chatRoomAvatar = document.getElementById('chatRoomAvatar');
+const chatRoomName = document.getElementById('chatRoomName');
+const chatRoomStatus = document.getElementById('chatRoomStatus');
 
 const defaultAvatarOptions = [
   { name: 'Amber Trail', symbol: '⛰️' },
@@ -46,9 +67,16 @@ const state = {
   alias: null,
   selectedAvatar: null,
   feed: [],
+  likedPostIds: new Set(),
   chats: [],
   ids: [],
   notifications: [],
+  activeChatId: null,
+  activeChatRecipientPublicId: null,
+  activeChatRecipientAlias: null,
+  activeChatRecipientAvatar: '👻',
+  ws: null,
+  wsReconnectTimer: null,
 };
 
 function showScreen(name) {
@@ -131,6 +159,39 @@ async function createIdentity() {
   }
 }
 
+async function recoverIdentity() {
+  const key = recoverKeyInput.value.trim();
+  if (!key) {
+    recoverError.textContent = 'Please enter your private key.';
+    recoverError.classList.remove('hidden');
+    return;
+  }
+  recoverError.classList.add('hidden');
+  recoverSubmit.disabled = true;
+  recoverSubmit.textContent = 'Recovering...';
+  try {
+    const data = await apiFetch('/api/identity/recover', {
+      method: 'POST',
+      body: JSON.stringify({ private_id: key }),
+    });
+    const identity = {
+      publicId: data.public_id,
+      privateId: data.private_id,
+      alias: data.alias,
+      avatar: data.avatar,
+      joinedAt: new Date(data.created_at).toISOString(),
+    };
+    localStorage.setItem('ghosttunnIdentity', JSON.stringify(identity));
+    await initializeApp(identity);
+  } catch (error) {
+    recoverError.textContent = 'Identity not found. Check your private key.';
+    recoverError.classList.remove('hidden');
+  } finally {
+    recoverSubmit.disabled = false;
+    recoverSubmit.textContent = 'Recover Identity';
+  }
+}
+
 function loadIdentity() {
   const raw = localStorage.getItem('ghosttunnIdentity');
   if (!raw) return null;
@@ -142,7 +203,7 @@ function loadIdentity() {
 }
 
 function updateAccountSummary() {
-  accountPosts.textContent = String(state.feed.filter(post => post.author === state.publicId).length || state.feed.length);
+  accountPosts.textContent = String(state.feed.filter(post => post.author === state.publicId).length);
   accountConnections.textContent = String(state.ids.length);
 }
 
@@ -155,6 +216,8 @@ function mapBackendPost(post) {
     alias: post.author_alias,
     time: new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     content: post.content,
+    likes: post.likes || 0,
+    liked: post.liked || false,
   };
 }
 
@@ -189,9 +252,13 @@ async function loadAvatarOptions() {
 
 async function loadFeed() {
   try {
-    const posts = await apiFetch('/api/feed');
+    const url = state.publicId
+      ? `/api/feed?viewer_public_id=${encodeURIComponent(state.publicId)}`
+      : '/api/feed';
+    const posts = await apiFetch(url);
     if (Array.isArray(posts)) {
       state.feed = posts.map(mapBackendPost);
+      state.likedPostIds = new Set(state.feed.filter(p => p.liked).map(p => p.id));
       renderFeed();
       updateAccountSummary();
       return;
@@ -200,16 +267,10 @@ async function loadFeed() {
     console.warn('Feed API unavailable:', error.message);
   }
   if (!state.feed.length) {
-    state.feed = [
-      {
-        id: 1,
-        author: '@Ghost-Echo-502',
-        avatar: '👻',
-        alias: 'Echo',
-        time: '10:32 PM',
-        content: 'The future belongs to builders.',
-      },
-    ];
+    state.feed = [{
+      id: 1, author: '@Ghost-Echo-502', avatar: '👻', alias: 'Echo',
+      time: '10:32 PM', content: 'The future belongs to builders.', likes: 0, liked: false,
+    }];
     renderFeed();
     updateAccountSummary();
   }
@@ -254,6 +315,18 @@ async function loadUserProfile() {
   }
 }
 
+async function loadChats() {
+  try {
+    const chats = await apiFetch(`/api/chats/${encodeURIComponent(state.publicId)}`);
+    if (Array.isArray(chats)) {
+      state.chats = chats;
+      renderChats();
+    }
+  } catch (error) {
+    console.warn('Chats API unavailable:', error.message);
+  }
+}
+
 async function submitPost(content) {
   try {
     const post = await apiFetch('/api/posts', {
@@ -266,11 +339,36 @@ async function submitPost(content) {
     return {
       id: Date.now(),
       author: state.publicId,
-      avatar: state.avatar.split(' ')[0],
+      avatar: state.avatar ? state.avatar.split(' ')[0] : '👻',
       alias: state.alias,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       content,
+      likes: 0,
+      liked: false,
     };
+  }
+}
+
+async function handleLike(postId, btn) {
+  const post = state.feed.find(p => p.id === postId);
+  if (!post) return;
+
+  try {
+    const result = await apiFetch(`/api/posts/${postId}/like`, {
+      method: 'POST',
+      body: JSON.stringify({ public_id: state.publicId }),
+    });
+    post.liked = result.liked;
+    post.likes = result.likes;
+    if (result.liked) {
+      state.likedPostIds.add(postId);
+    } else {
+      state.likedPostIds.delete(postId);
+    }
+    btn.textContent = `${post.liked ? '❤️' : '🤍'} ${post.likes}`;
+    btn.classList.toggle('liked', post.liked);
+  } catch (err) {
+    console.warn('Like failed:', err.message);
   }
 }
 
@@ -279,6 +377,7 @@ function renderFeed() {
   state.feed.forEach(post => {
     const item = document.createElement('article');
     item.className = 'feed-item';
+    const likedClass = post.liked ? ' liked' : '';
     item.innerHTML = `
       <header>
         <div class="profile">
@@ -289,35 +388,50 @@ function renderFeed() {
       </header>
       <p>${post.content}</p>
       <div class="action-row">
-        <span class="action-pill">❤ Like</span>
+        <button class="action-pill action-pill--like${likedClass}" data-post-id="${post.id}">${post.liked ? '❤️' : '🤍'} ${post.likes}</button>
         <span class="action-pill">💬 Comment</span>
         <span class="action-pill">🔄 Repost</span>
       </div>
     `;
+    const likeBtn = item.querySelector('.action-pill--like');
+    likeBtn.addEventListener('click', () => handleLike(post.id, likeBtn));
     feedList.appendChild(item);
   });
 }
 
 function renderChats() {
   chatList.innerHTML = '';
+  if (state.chats.length === 0) {
+    chatList.innerHTML = '<p class="empty-state">No chats yet. Start one above.</p>';
+    return;
+  }
   state.chats.forEach(chat => {
+    const otherId = chat.user_a_id === state.publicId ? chat.user_b_id : chat.user_b_id;
     const item = document.createElement('article');
     item.className = 'chat-card';
     item.innerHTML = `
       <header>
         <div class="profile">
-          <span class="profile-avatar">${chat.avatar}</span>
-          <div class="profile-label"><strong>${chat.publicId}</strong><small>${chat.lastMessage}</small></div>
+          <span class="profile-avatar">👻</span>
+          <div class="profile-label">
+            <strong>Chat #${chat.chat_id}</strong>
+            <small>Tap to open</small>
+          </div>
         </div>
-        <span class="timestamp">${chat.time}</span>
+        <span class="timestamp">${new Date(chat.created_at).toLocaleDateString()}</span>
       </header>
     `;
+    item.addEventListener('click', () => openChatRoom(chat.chat_id, null, null, '👻'));
     chatList.appendChild(item);
   });
 }
 
 function renderConnections() {
   idConnections.innerHTML = '';
+  if (state.ids.length === 0) {
+    idConnections.innerHTML = '<p class="empty-state">No connections yet.</p>';
+    return;
+  }
   state.ids.forEach(connection => {
     const card = document.createElement('article');
     card.className = 'id-card';
@@ -337,6 +451,10 @@ function renderConnections() {
 
 function renderNotifications() {
   notificationsList.innerHTML = '';
+  if (state.notifications.length === 0) {
+    notificationsList.innerHTML = '<p class="empty-state">No notifications yet.</p>';
+    return;
+  }
   state.notifications.forEach(note => {
     const card = document.createElement('article');
     card.className = 'notification-card';
@@ -354,14 +472,221 @@ function showView(viewId) {
   navItems.forEach(item => item.classList.toggle('nav-item--active', item.dataset.target === viewId));
 }
 
+// ── Chat Room ──────────────────────────────────────────────────────────────
+
+async function openChatRoom(chatId, recipientPublicId, recipientAlias, recipientAvatar) {
+  state.activeChatId = chatId;
+  state.activeChatRecipientPublicId = recipientPublicId;
+  state.activeChatRecipientAlias = recipientAlias || `Chat #${chatId}`;
+  state.activeChatRecipientAvatar = recipientAvatar || '👻';
+
+  chatRoomAvatar.textContent = state.activeChatRecipientAvatar;
+  chatRoomName.textContent = state.activeChatRecipientAlias;
+  chatRoomStatus.textContent = 'Online';
+  chatRoomMessages.innerHTML = '';
+  chatRoomOverlay.classList.remove('hidden');
+  document.body.classList.add('chat-open');
+
+  try {
+    const messages = await apiFetch(`/api/messages/${chatId}`);
+    messages.forEach(msg => appendChatMessage(msg.sender_public_id, msg.content, msg.created_at));
+  } catch (err) {
+    console.warn('Could not load messages:', err.message);
+  }
+  scrollChatToBottom();
+  chatRoomInput.focus();
+}
+
+function closeChatRoom() {
+  chatRoomOverlay.classList.add('hidden');
+  document.body.classList.remove('chat-open');
+  state.activeChatId = null;
+}
+
+function appendChatMessage(senderPublicId, content, createdAt) {
+  const isMine = senderPublicId === state.publicId;
+  const bubble = document.createElement('div');
+  bubble.className = `chat-bubble ${isMine ? 'chat-bubble--mine' : 'chat-bubble--theirs'}`;
+  const time = createdAt ? new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  bubble.innerHTML = `<span class="bubble-text">${escapeHtml(content)}</span><span class="bubble-time">${time}</span>`;
+  chatRoomMessages.appendChild(bubble);
+}
+
+function scrollChatToBottom() {
+  chatRoomMessages.scrollTop = chatRoomMessages.scrollHeight;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function sendChatMessage() {
+  const content = chatRoomInput.value.trim();
+  if (!content || !state.activeChatId) return;
+  chatRoomInput.value = '';
+  chatRoomInput.style.height = 'auto';
+
+  const optimistic = { sender_public_id: state.publicId, content, created_at: new Date().toISOString() };
+  appendChatMessage(optimistic.sender_public_id, optimistic.content, optimistic.created_at);
+  scrollChatToBottom();
+
+  if (state.ws && state.ws.readyState === WebSocket.OPEN && state.activeChatRecipientPublicId) {
+    state.ws.send(JSON.stringify({
+      type: 'message',
+      chat_id: state.activeChatId,
+      sender_public_id: state.publicId,
+      recipient_public_id: state.activeChatRecipientPublicId,
+      content,
+    }));
+  } else {
+    try {
+      await apiFetch('/api/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          chat_id: state.activeChatId,
+          sender_public_id: state.publicId,
+          recipient_public_id: state.activeChatRecipientPublicId || state.publicId,
+          content,
+        }),
+      });
+    } catch (err) {
+      console.warn('Message send failed:', err.message);
+    }
+  }
+}
+
+async function startNewChat() {
+  const targetId = newChatInput.value.trim();
+  if (!targetId) return;
+  try {
+    const result = await apiFetch('/api/chats', {
+      method: 'POST',
+      body: JSON.stringify({ sender_public_id: state.publicId, recipient_public_id: targetId }),
+    });
+    newChatInput.value = '';
+    state.activeChatRecipientPublicId = targetId;
+    await openChatRoom(result.chat_id, targetId, targetId, '👻');
+    await loadChats();
+  } catch (err) {
+    alert('Could not start chat. Make sure the Ghost ID exists.');
+  }
+}
+
+// ── WebSocket ──────────────────────────────────────────────────────────────
+
+function connectWebSocket() {
+  if (!state.publicId) return;
+  const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+  const wsUrl = `${protocol}://${location.host}/ws/${encodeURIComponent(state.publicId)}`;
+  const ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    console.log('WS connected');
+    state.ws = ws;
+    if (state.wsReconnectTimer) {
+      clearTimeout(state.wsReconnectTimer);
+      state.wsReconnectTimer = null;
+    }
+    ws.send(JSON.stringify({ type: 'ping' }));
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'message') {
+        if (state.activeChatId === data.chat_id && data.sender_public_id !== state.publicId) {
+          appendChatMessage(data.sender_public_id, data.content, data.created_at);
+          scrollChatToBottom();
+        }
+      }
+    } catch (e) {
+      console.warn('WS parse error:', e);
+    }
+  };
+
+  ws.onclose = () => {
+    state.ws = null;
+    state.wsReconnectTimer = setTimeout(connectWebSocket, 3000);
+  };
+
+  ws.onerror = () => {
+    ws.close();
+  };
+}
+
+// ── Terminal ───────────────────────────────────────────────────────────────
+
+function appendTerminalLine(text, cls = '') {
+  const line = document.createElement('div');
+  line.className = `terminal-line${cls ? ' ' + cls : ''}`;
+  line.textContent = text;
+  terminalOutput.appendChild(line);
+  terminalOutput.scrollTop = terminalOutput.scrollHeight;
+}
+
+function appendTerminalInput(cmd) {
+  const line = document.createElement('div');
+  line.className = 'terminal-line terminal-line--input';
+  line.innerHTML = `<span class="terminal-prompt-echo">ghost@tunn:~$</span> <span>${escapeHtml(cmd)}</span>`;
+  terminalOutput.appendChild(line);
+  terminalOutput.scrollTop = terminalOutput.scrollHeight;
+}
+
+async function printTerminalLines(lines, delayMs = 30) {
+  for (const line of lines) {
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+    appendTerminalLine(line, 'terminal-line--output');
+  }
+}
+
+async function runTerminalCommand(cmd) {
+  if (!cmd.trim()) return;
+  appendTerminalInput(cmd);
+  terminalInput.disabled = true;
+
+  try {
+    const result = await apiFetch('/api/terminal', {
+      method: 'POST',
+      body: JSON.stringify({ command: cmd, public_id: state.publicId }),
+    });
+
+    if (result.clear) {
+      terminalOutput.innerHTML = '';
+    }
+
+    if (result.output && result.output.length > 0) {
+      await printTerminalLines(result.output, 28);
+    }
+
+    if (result.status === 'bld_active') {
+      terminalInput.placeholder = '@ghost send <id> <message>';
+    } else if (result.status === 'bld_exit') {
+      terminalInput.placeholder = 'ghost help';
+    }
+  } catch (err) {
+    appendTerminalLine(`  Error: ${err.message}`, 'terminal-line--error');
+  } finally {
+    terminalInput.disabled = false;
+    terminalInput.focus();
+    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+  }
+}
+
+// ── Event bindings ─────────────────────────────────────────────────────────
+
 function bindEvents() {
-  welcomeContinue.addEventListener('click', () => {
-    showScreen('identity');
+  welcomeContinue.addEventListener('click', () => showScreen('identity'));
+  welcomeRecover.addEventListener('click', () => {
+    recoverKeyInput.value = '';
+    recoverError.classList.add('hidden');
+    showScreen('recover');
   });
 
-  identityBack.addEventListener('click', () => {
-    showScreen('welcome');
-  });
+  recoverBack.addEventListener('click', () => showScreen('welcome'));
+  recoverSubmit.addEventListener('click', recoverIdentity);
+  recoverKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') recoverIdentity(); });
+
+  identityBack.addEventListener('click', () => showScreen('welcome'));
 
   saveIdentityButton.addEventListener('click', async () => {
     await createIdentity();
@@ -382,28 +707,39 @@ function bindEvents() {
   });
 
   postInput.addEventListener('input', () => {
-    const length = postInput.value.length;
-    charCount.textContent = `${length} / 280`;
+    charCount.textContent = `${postInput.value.length} / 280`;
   });
 
   revealPrivate.addEventListener('click', () => {
     accountPrivateId.textContent = state.privateId;
   });
 
-  resetIdentity.addEventListener('click', () => {
-    localStorage.removeItem('ghosttunnIdentity');
-    window.location.reload();
+  copyPrivate.addEventListener('click', () => {
+    navigator.clipboard.writeText(state.privateId).then(() => {
+      copyPrivate.textContent = 'Copied!';
+      setTimeout(() => { copyPrivate.textContent = 'Copy Key'; }, 2000);
+    });
   });
 
-  navItems.forEach(item => item.addEventListener('click', () => showView(item.dataset.target)));
+  resetIdentity.addEventListener('click', () => {
+    if (confirm('Reset identity? This will log you out. Your key still works to recover access.')) {
+      localStorage.removeItem('ghosttunnIdentity');
+      window.location.reload();
+    }
+  });
+
+  navItems.forEach(item => item.addEventListener('click', () => {
+    showView(item.dataset.target);
+    if (item.dataset.target === 'chatsView') loadChats();
+    if (item.dataset.target === 'terminalView') terminalInput.focus();
+  }));
 
   globalSearch.addEventListener('input', () => {
     const query = globalSearch.value.toLowerCase();
-    if (!query) {
-      renderFeed();
-      return;
-    }
-    const filtered = state.feed.filter(post => post.content.toLowerCase().includes(query) || post.author.toLowerCase().includes(query));
+    if (!query) { renderFeed(); return; }
+    const filtered = state.feed.filter(post =>
+      post.content.toLowerCase().includes(query) || post.author.toLowerCase().includes(query)
+    );
     feedList.innerHTML = '';
     filtered.forEach(post => {
       const item = document.createElement('article');
@@ -418,7 +754,7 @@ function bindEvents() {
         </header>
         <p>${post.content}</p>
         <div class="action-row">
-          <span class="action-pill">❤ Like</span>
+          <span class="action-pill">🤍 ${post.likes}</span>
           <span class="action-pill">💬 Comment</span>
           <span class="action-pill">🔄 Repost</span>
         </div>
@@ -426,6 +762,33 @@ function bindEvents() {
       feedList.appendChild(item);
     });
   });
+
+  terminalInput.addEventListener('keydown', async e => {
+    if (e.key === 'Enter') {
+      const cmd = terminalInput.value.trim();
+      terminalInput.value = '';
+      await runTerminalCommand(cmd);
+    }
+  });
+
+  chatBackBtn.addEventListener('click', closeChatRoom);
+
+  chatSendBtn.addEventListener('click', sendChatMessage);
+
+  chatRoomInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  });
+
+  chatRoomInput.addEventListener('input', () => {
+    chatRoomInput.style.height = 'auto';
+    chatRoomInput.style.height = Math.min(chatRoomInput.scrollHeight, 120) + 'px';
+  });
+
+  newChatBtn.addEventListener('click', startNewChat);
+  newChatInput.addEventListener('keydown', e => { if (e.key === 'Enter') startNewChat(); });
 }
 
 async function initializeApp(identity) {
@@ -435,15 +798,16 @@ async function initializeApp(identity) {
   state.avatar = identity.avatar;
   state.selectedAvatar = { symbol: identity.avatar.split(' ')[0], name: identity.avatar.split(' ').slice(1).join(' ') };
   accountPublicId.textContent = state.publicId;
-  accountPrivateId.textContent = 'Private ID hidden';
+  accountPrivateId.textContent = 'Private ID hidden — tap Reveal';
   accountAvatar.textContent = identity.avatar.split(' ')[0];
   accountJoined.textContent = new Date(identity.joinedAt).toLocaleDateString();
   showScreen('app');
   showView('homeView');
+  connectWebSocket();
   await loadUserProfile();
   await loadFeed();
   await loadNotifications();
-  renderChats();
+  await loadChats();
   renderConnections();
 }
 

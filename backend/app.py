@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,15 +14,19 @@ from crud import (
     create_message,
     create_post,
     get_feed,
+    get_liked_post_ids,
     get_messages,
     get_notifications,
+    get_user_by_private,
     get_user_by_public,
     get_user_chats,
+    toggle_like,
 )
 from database import Base, engine, get_session
 from schemas import (
     ChatCreate,
     IdentityCreateResponse,
+    IdentityRecoverResponse,
     MessageCreate,
     MessageResponse,
     NotificationResponse,
@@ -31,7 +35,7 @@ from schemas import (
 )
 from utils import get_avatar_choices
 from terminal import router as terminal_router
-
+from websocket_manager import manager
 
 settings = Settings()
 
@@ -124,6 +128,23 @@ async def create_identity_endpoint(avatar: str, session: AsyncSession = Depends(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@app.post("/api/identity/recover", response_model=IdentityRecoverResponse)
+async def recover_identity(payload: dict, session: AsyncSession = Depends(get_session)):
+    private_id = (payload.get("private_id") or "").strip()
+    if not private_id:
+        raise HTTPException(status_code=400, detail="private_id is required")
+    user = await get_user_by_private(session, private_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Identity not found. Check your private key.")
+    return IdentityRecoverResponse(
+        public_id=user.public_id,
+        private_id=user.private_id,
+        alias=user.alias,
+        avatar=user.avatar,
+        created_at=user.created_at,
+    )
+
+
 @app.get("/api/user/{public_id}")
 async def get_user(public_id: str, session: AsyncSession = Depends(get_session)):
     user = await get_user_by_public(session, public_id)
@@ -138,8 +159,9 @@ async def get_user(public_id: str, session: AsyncSession = Depends(get_session))
 
 
 @app.get("/api/feed", response_model=list[PostResponse])
-async def feed(session: AsyncSession = Depends(get_session)):
+async def feed(viewer_public_id: str = "", session: AsyncSession = Depends(get_session)):
     posts = await get_feed(session)
+    liked_ids = await get_liked_post_ids(session, viewer_public_id) if viewer_public_id else set()
     return [
         PostResponse(
             id=post.id,
@@ -152,6 +174,7 @@ async def feed(session: AsyncSession = Depends(get_session)):
             comments=post.comments,
             reposts=post.reposts,
             created_at=post.created_at,
+            liked=post.id in liked_ids,
         )
         for post in posts
     ]
@@ -172,7 +195,20 @@ async def post_message(payload: PostCreate, session: AsyncSession = Depends(get_
             comments=post.comments,
             reposts=post.reposts,
             created_at=post.created_at,
+            liked=False,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.post("/api/posts/{post_id}/like")
+async def like_post(post_id: int, payload: dict, session: AsyncSession = Depends(get_session)):
+    public_id = (payload.get("public_id") or "").strip()
+    if not public_id:
+        raise HTTPException(status_code=400, detail="public_id required")
+    try:
+        post, liked = await toggle_like(session, post_id, public_id)
+        return {"likes": post.likes, "liked": liked}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -189,15 +225,16 @@ async def open_chat(payload: ChatCreate, session: AsyncSession = Depends(get_ses
 @app.get("/api/chats/{public_id}")
 async def chats_for_user(public_id: str, session: AsyncSession = Depends(get_session)):
     chats = await get_user_chats(session, public_id)
-    return [
-        {
+    result = []
+    for chat in chats:
+        result.append({
             "chat_id": chat.id,
-            "participant_ids": [chat.user_a_id, chat.user_b_id],
+            "user_a_id": chat.user_a_id,
+            "user_b_id": chat.user_b_id,
             "created_at": chat.created_at,
             "active": chat.active,
-        }
-        for chat in chats
-    ]
+        })
+    return result
 
 
 @app.get("/api/messages/{chat_id}", response_model=list[MessageResponse])
@@ -226,6 +263,20 @@ async def send_message(payload: MessageCreate, session: AsyncSession = Depends(g
             payload.recipient_public_id,
             payload.content,
         )
+        msg_data = {
+            "type": "message",
+            "id": message.id,
+            "chat_id": message.chat_id,
+            "sender_public_id": message.sender.public_id,
+            "recipient_public_id": message.recipient.public_id,
+            "content": message.content,
+            "created_at": message.created_at.isoformat(),
+        }
+        await manager.broadcast_to_pair(
+            message.sender.public_id,
+            message.recipient.public_id,
+            msg_data,
+        )
         return MessageResponse(
             id=message.id,
             chat_id=message.chat_id,
@@ -236,6 +287,44 @@ async def send_message(payload: MessageCreate, session: AsyncSession = Depends(g
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.websocket("/ws/{public_id}")
+async def websocket_endpoint(websocket: WebSocket, public_id: str, session: AsyncSession = Depends(get_session)):
+    await manager.connect(websocket, public_id)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            msg_type = data.get("type")
+            if msg_type == "message":
+                try:
+                    message = await create_message(
+                        session,
+                        data["chat_id"],
+                        data["sender_public_id"],
+                        data["recipient_public_id"],
+                        data["content"],
+                    )
+                    out = {
+                        "type": "message",
+                        "id": message.id,
+                        "chat_id": message.chat_id,
+                        "sender_public_id": message.sender.public_id,
+                        "recipient_public_id": message.recipient.public_id,
+                        "content": message.content,
+                        "created_at": message.created_at.isoformat(),
+                    }
+                    await manager.broadcast_to_pair(
+                        message.sender.public_id,
+                        message.recipient.public_id,
+                        out,
+                    )
+                except Exception as e:
+                    await websocket.send_json({"type": "error", "message": str(e)})
+            elif msg_type == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        manager.disconnect(public_id)
 
 
 app.include_router(terminal_router, prefix="/api")

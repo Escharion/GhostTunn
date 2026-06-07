@@ -1,8 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from models import Chat, Message, Notification, Post, User
+from models import Chat, Message, Notification, Post, PostLike, User
 from utils import generate_private_id, generate_public_id
 
 
@@ -26,14 +27,30 @@ async def get_user_by_public(session: AsyncSession, public_id: str):
     return result.scalars().first()
 
 
+async def get_user_by_private(session: AsyncSession, private_id: str):
+    result = await session.execute(select(User).where(User.private_id == private_id))
+    return result.scalars().first()
+
+
 async def get_user_posts(session: AsyncSession, public_id: str):
-    stmt = select(Post).join(User).where(User.public_id == public_id).order_by(Post.created_at.desc())
+    stmt = (
+        select(Post)
+        .join(User)
+        .where(User.public_id == public_id)
+        .options(selectinload(Post.author))
+        .order_by(Post.created_at.desc())
+    )
     result = await session.execute(stmt)
     return result.scalars().all()
 
 
 async def get_feed(session: AsyncSession, limit: int = 20):
-    stmt = select(Post).order_by(Post.created_at.desc()).limit(limit)
+    stmt = (
+        select(Post)
+        .options(selectinload(Post.author))
+        .order_by(Post.created_at.desc())
+        .limit(limit)
+    )
     result = await session.execute(stmt)
     return result.scalars().all()
 
@@ -45,8 +62,43 @@ async def create_post(session: AsyncSession, author_public_id: str, content: str
     post = Post(author_id=user.id, content=content, color=color)
     session.add(post)
     await session.commit()
+    stmt = select(Post).where(Post.id == post.id).options(selectinload(Post.author))
+    result = await session.execute(stmt)
+    return result.scalars().first()
+
+
+async def toggle_like(session: AsyncSession, post_id: int, public_id: str):
+    user = await get_user_by_public(session, public_id)
+    if not user:
+        raise ValueError("User not found")
+    post = await session.get(Post, post_id)
+    if not post:
+        raise ValueError("Post not found")
+
+    existing = (await session.execute(
+        select(PostLike).where(PostLike.post_id == post_id, PostLike.user_id == user.id)
+    )).scalars().first()
+
+    if existing:
+        await session.delete(existing)
+        post.likes = max(0, post.likes - 1)
+        liked = False
+    else:
+        session.add(PostLike(post_id=post_id, user_id=user.id))
+        post.likes = post.likes + 1
+        liked = True
+
+    await session.commit()
     await session.refresh(post)
-    return post
+    return post, liked
+
+
+async def get_liked_post_ids(session: AsyncSession, public_id: str):
+    user = await get_user_by_public(session, public_id)
+    if not user:
+        return set()
+    result = await session.execute(select(PostLike.post_id).where(PostLike.user_id == user.id))
+    return set(result.scalars().all())
 
 
 async def create_chat(session: AsyncSession, sender_public_id: str, recipient_public_id: str):
@@ -72,7 +124,11 @@ async def get_user_chats(session: AsyncSession, public_id: str):
     user = await get_user_by_public(session, public_id)
     if not user:
         return []
-    stmt = select(Chat).where((Chat.user_a_id == user.id) | (Chat.user_b_id == user.id)).order_by(Chat.created_at.desc())
+    stmt = (
+        select(Chat)
+        .where((Chat.user_a_id == user.id) | (Chat.user_b_id == user.id))
+        .order_by(Chat.created_at.desc())
+    )
     result = await session.execute(stmt)
     return result.scalars().all()
 
@@ -88,12 +144,23 @@ async def create_message(session: AsyncSession, chat_id: int, sender_public_id: 
     message = Message(chat_id=chat.id, sender_id=sender.id, recipient_id=recipient.id, content=content)
     session.add(message)
     await session.commit()
-    await session.refresh(message)
-    return message
+    stmt = (
+        select(Message)
+        .where(Message.id == message.id)
+        .options(selectinload(Message.sender), selectinload(Message.recipient))
+    )
+    result = await session.execute(stmt)
+    return result.scalars().first()
 
 
 async def get_messages(session: AsyncSession, chat_id: int, limit: int = 100):
-    stmt = select(Message).where(Message.chat_id == chat_id).order_by(Message.created_at.asc()).limit(limit)
+    stmt = (
+        select(Message)
+        .where(Message.chat_id == chat_id)
+        .options(selectinload(Message.sender), selectinload(Message.recipient))
+        .order_by(Message.created_at.asc())
+        .limit(limit)
+    )
     result = await session.execute(stmt)
     return result.scalars().all()
 

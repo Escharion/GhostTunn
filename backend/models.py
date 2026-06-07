@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -18,6 +18,7 @@ class User(Base):
     sent_messages = relationship("Message", back_populates="sender", foreign_keys="Message.sender_id")
     received_messages = relationship("Message", back_populates="recipient", foreign_keys="Message.recipient_id")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete")
+    likes = relationship("PostLike", back_populates="user", cascade="all, delete")
 
 
 class Post(Base):
@@ -33,6 +34,21 @@ class Post(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     author = relationship("User", back_populates="posts")
+    liked_by = relationship("PostLike", back_populates="post", cascade="all, delete")
+
+
+class PostLike(Base):
+    __tablename__ = "post_likes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    post = relationship("Post", back_populates="liked_by")
+    user = relationship("User", back_populates="likes")
+
+    __table_args__ = (UniqueConstraint("post_id", "user_id", name="uq_post_like"),)
 
 
 class Chat(Base):
