@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import Settings
+from backend.config import Settings
 from crud import (
     create_chat,
     create_identity,
