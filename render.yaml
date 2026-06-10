@@ -1,0 +1,7 @@
+services:
+  -type: web
+  name: ghosttunn
+  env: pyton
+  buildcommand: pip install -r requirements.txt
+  startcommand: gunicorn --bindbackend.app:app
+  autoDeploy: true
