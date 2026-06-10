@@ -1,5 +1,6 @@
 services:
   -type: web
+  runntime: python 
   name: ghosttunn
   env: python
   buildcommand: pip install -r requirements.prod.txt
