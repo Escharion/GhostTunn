@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.database import Base, engine, get_session
+
 from backend.config import Settings
 from backend.crud import (
     create_chat,
@@ -23,7 +23,7 @@ from backend.crud import (
     get_user_chats,
     toggle_like,
 )
-from database import Base, engine, get_session
+from backend.database import Base, engine, get_session
 from backend.schemas import (
     ChatCreate,
     IdentityCreateResponse,
