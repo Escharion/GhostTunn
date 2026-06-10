@@ -1,7 +1,7 @@
 services:
   -type: web
   name: ghosttunn
-  env: pyton
-  buildcommand: pip install -r requirements.txt
-  startcommand: gunicorn --bindbackend.app:app
+  env: python
+  buildcommand: pip install -r requirements.prod.txt
+  startcommand: uvicorn --bind backend.app:app --host 0.0.0.0 --port $PORT
   autoDeploy: true
