@@ -1,9 +1,11 @@
+pydantic-settings==2.13.0
+setuptools==79.0.1
+wheel==0.40.0
 fastapi==0.116.0
 uvicorn[standard]==0.35.0
 SQLAlchemy==2.0.33
 greenlet==3.5.1
 asyncpg==0.30.0
 python-dotenv==1.0.0
-pydantic-settings==2.13.0
 aiofiles==23.2.1
 aiosqlite==0.19.0
