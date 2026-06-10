@@ -3,8 +3,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from models import Chat, Message, Notification, Post, PostLike, User
-from utils import generate_private_id, generate_public_id
+from backend.models import Chat, Message, Notification, Post, PostLike, User
+from backend.utils import generate_private_id, generate_public_id
 
 
 async def create_identity(session: AsyncSession, avatar: str, alias: str | None = None):
