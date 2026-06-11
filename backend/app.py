@@ -325,6 +325,14 @@ async def websocket_endpoint(websocket: WebSocket, public_id: str, session: Asyn
                     )
                 except Exception as e:
                     await websocket.send_json({"type": "error", "message": str(e)})
+            elif msg_type == "typing":
+                recipient_id = data.get("recipient_public_id")
+                if recipient_id:
+                    await manager.send_to(recipient_id, {
+                        "type": "typing",
+                        "sender_public_id": public_id,
+                        "chat_id": data.get("chat_id"),
+                    })
             elif msg_type == "ping":
                 await websocket.send_json({"type": "pong"})
     except WebSocketDisconnect:

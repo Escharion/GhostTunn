@@ -78,6 +78,8 @@ const state = {
   ws: null,
   wsReconnectTimer: null,
   unreadCounts: {},
+  typingHideTimer: null,
+  typingSendTimer: null,
 };
 
 function showScreen(name) {
@@ -586,6 +588,41 @@ async function startNewChat() {
   }
 }
 
+// ── Typing indicator ───────────────────────────────────────────────────────
+
+function showTypingIndicator() {
+  let el = document.getElementById('typingIndicator');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'typingIndicator';
+    el.className = 'typing-indicator';
+    el.innerHTML = `<span></span><span></span><span></span>`;
+    chatRoomMessages.appendChild(el);
+  }
+  el.classList.remove('hidden');
+  scrollChatToBottom();
+  clearTimeout(state.typingHideTimer);
+  state.typingHideTimer = setTimeout(hideTypingIndicator, 3000);
+}
+
+function hideTypingIndicator() {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.classList.add('hidden');
+  clearTimeout(state.typingHideTimer);
+  state.typingHideTimer = null;
+}
+
+function sendTypingEvent() {
+  if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+  if (!state.activeChatId || !state.activeChatRecipientPublicId) return;
+  state.ws.send(JSON.stringify({
+    type: 'typing',
+    chat_id: state.activeChatId,
+    sender_public_id: state.publicId,
+    recipient_public_id: state.activeChatRecipientPublicId,
+  }));
+}
+
 // ── WebSocket ──────────────────────────────────────────────────────────────
 
 function updateChatBadge() {
@@ -625,6 +662,7 @@ function connectWebSocket() {
     try {
       const data = JSON.parse(event.data);
       if (data.type === 'message' && data.sender_public_id !== state.publicId) {
+        hideTypingIndicator();
         if (state.activeChatId === data.chat_id && !chatRoomOverlay.classList.contains('hidden')) {
           appendChatMessage(data.sender_public_id, data.content, data.created_at);
           scrollChatToBottom();
@@ -632,6 +670,10 @@ function connectWebSocket() {
           state.unreadCounts[data.chat_id] = (state.unreadCounts[data.chat_id] || 0) + 1;
           updateChatBadge();
           renderChats();
+        }
+      } else if (data.type === 'typing' && data.sender_public_id !== state.publicId) {
+        if (state.activeChatId === data.chat_id && !chatRoomOverlay.classList.contains('hidden')) {
+          showTypingIndicator();
         }
       }
     } catch (e) {
@@ -821,6 +863,8 @@ function bindEvents() {
   chatRoomInput.addEventListener('input', () => {
     chatRoomInput.style.height = 'auto';
     chatRoomInput.style.height = Math.min(chatRoomInput.scrollHeight, 120) + 'px';
+    clearTimeout(state.typingSendTimer);
+    state.typingSendTimer = setTimeout(sendTypingEvent, 300);
   });
 
   newChatBtn.addEventListener('click', startNewChat);

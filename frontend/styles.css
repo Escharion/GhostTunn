@@ -744,6 +744,43 @@ code {
   padding: 0 0.25rem;
 }
 
+/* ── Typing indicator ───────────────────────────────────── */
+
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 0.6rem 1rem;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  border-bottom-left-radius: 6px;
+  width: fit-content;
+  margin-bottom: 4px;
+}
+
+.typing-indicator.hidden {
+  display: none !important;
+}
+
+.typing-indicator span {
+  width: 7px;
+  height: 7px;
+  background: var(--muted);
+  border-radius: 50%;
+  animation: typing-bounce 1.2s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) { animation-delay: 0s; }
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30%            { transform: translateY(-6px); opacity: 1; }
+}
+
 /* WhatsApp-style input bar — always visible at bottom */
 .chat-room-input-bar {
   display: flex;
