@@ -10,9 +10,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import Settings
-from crud import (
-    add_product,
+
+from backend.config import Settings
+from backend.crud import (
     create_chat,
     create_identity,
     create_message,
@@ -33,8 +33,8 @@ from crud import (
     mark_messages_read,
     toggle_like,
 )
-from database import Base, engine, get_session
-from schemas import (
+from backend.database import Base, engine, get_session
+from backend.schemas import (
     ChatCreate,
     IdentityCreateResponse,
     IdentityRecoverResponse,
@@ -44,9 +44,9 @@ from schemas import (
     PostCreate,
     PostResponse,
 )
-from utils import get_avatar_choices
-from terminal import router as terminal_router
-from websocket_manager import manager
+from backend.utils import get_avatar_choices
+from backend.terminal import router as terminal_router
+from backend.websocket_manager import manager
 
 settings = Settings()
 

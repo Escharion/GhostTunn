@@ -134,7 +134,7 @@ img, video {
   object-fit: cover;
   border: 1px solid rgba(80, 170, 255, 0.4);
   box-shadow: 0 0 20px rgba(60, 140, 255, 0.2);
-  animation: brandRingPulse 3s ease-in-out infinite;
+  animation: brandRingPulse 1s ease-in-out infinite;
   flex-shrink: 0;
 }
 
@@ -2289,34 +2289,45 @@ body {
 }
 
 .terminal-line.command {
-  color: #fff;
+  color: #f2f0f0;
 }
 
 .terminal-line.root-cmd {
-  color: #f0a0ff;
+  color: #ff00d0;
   font-weight: 700;
 }
 
 .terminal-line.error {
-  color: #ff8e8e;
+  color: #ff0000;
 }
 
 .terminal-line.info {
-  color: #b8f8ff;
+  color: #8903ff;
 }
 
 .terminal-line.warn {
-  color: #fbbf24;
+  color: #f70505;
   font-weight: 600;
 }
 
 .terminal-line.success {
-  color: #4ade80;
+  color: #09fe05;
   font-weight: 600;
 }
 
 .terminal-line.root {
   color: #c084fc;
+}
+
+/* Ads formats */
+.terminal-line-ads {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.terminal-line-ads.info {
+  color: #031cff;
 }
 
 /* ─── BLD banner ────────────────────────────────────── */
