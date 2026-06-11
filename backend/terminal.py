@@ -532,17 +532,16 @@ async def terminal_command(request: TerminalRequest) -> TerminalResponse:
         ])
 
     if cmd == "ghost files":
-        lines = ["  ┌──────── YOUR FILES ────────┐", ""]
-        for f in FAKE_FILES:
-            lines.append(f"  {f}")
-        lines += ["", f"  {len(FAKE_FILES)} files stored"]
-        return TerminalResponse(output=lines)
+        return TerminalResponse(
+            output=["  Opening Vault — your real file storage..."],
+            status="vault_redirect",
+        )
 
     if cmd == "ghost upload":
-        return TerminalResponse(output=[
-            "  File upload is handled via the Files panel (coming soon).",
-            "  End-to-end encrypted storage is available for Ghost Pro users.",
-        ])
+        return TerminalResponse(
+            output=["  Opening Vault..."],
+            status="vault_redirect",
+        )
 
     if cmd.startswith("ghost download "):
         fid = raw.split(" ", 2)[2] if len(raw.split(" ", 2)) > 2 else "unknown"
@@ -589,11 +588,25 @@ async def terminal_command(request: TerminalRequest) -> TerminalResponse:
             "  GhostTunn v1.0.0 — you are up to date.",
         ])
 
-    if cmd == "ghost theme":
-        return TerminalResponse(output=[
-            "  Theme toggled.",
-            "  Restart the terminal to apply the new theme.",
-        ])
+    if cmd.startswith("ghost theme"):
+        parts = cmd.split()
+        themes = ["amber", "green", "blue", "red", "white", "purple"]
+        chosen = parts[2] if len(parts) > 2 and parts[2] in themes else None
+        if not chosen:
+            theme_list = "  ".join(themes)
+            return TerminalResponse(output=[
+                "  Usage: ghost theme <name>",
+                f"  Available: {theme_list}",
+                "  Example: ghost theme green",
+            ])
+        return TerminalResponse(
+            output=[
+                f"  Theme changed to '{chosen}'.",
+                "  Terminal colour updated instantly.",
+            ],
+            status="theme",
+            extra={"theme": chosen},
+        )
 
     if cmd == "ghost stats":
         return TerminalResponse(output=[
@@ -611,15 +624,10 @@ async def terminal_command(request: TerminalRequest) -> TerminalResponse:
         ])
 
     if cmd == "ghost ping":
-        ms = random.randint(8, 60)
-        return TerminalResponse(output=[
-            "  Pinging ghost-relay-eu-01...",
-            f"  Reply from relay: time={ms}ms  TTL=64",
-            f"  Reply from relay: time={ms+2}ms  TTL=64",
-            f"  Reply from relay: time={ms-1}ms  TTL=64",
-            "",
-            f"  Avg latency: {ms}ms — Connection is healthy.",
-        ])
+        return TerminalResponse(
+            output=["  Measuring live WebSocket latency..."],
+            status="ws_ping",
+        )
 
     if cmd == "ghost clear":
         return TerminalResponse(output=[], clear=True)

@@ -80,6 +80,13 @@ const state = {
   unreadCounts: {},
   typingHideTimer: null,
   typingSendTimer: null,
+  vault: [],
+  market: [],
+  myStore: null,
+  onlineUsers: new Set(),
+  terminalTheme: 'default',
+  marketProductImageUrl: null,
+  wsPingStart: null,
 };
 
 function showScreen(name) {
@@ -416,15 +423,19 @@ function renderChats() {
     const otherAvatar = otherAvatarFull ? otherAvatarFull.split(' ')[0] : '👻';
     const unread = state.unreadCounts[chat.chat_id] || 0;
 
+    const isOnline = state.onlineUsers.has(otherPublicId);
     const item = document.createElement('article');
     item.className = 'chat-card';
     item.innerHTML = `
       <header>
         <div class="profile">
-          <span class="profile-avatar">${otherAvatar}</span>
+          <div class="profile-avatar-wrap">
+            <span class="profile-avatar">${otherAvatar}</span>
+            ${isOnline ? '<span class="presence-dot"></span>' : ''}
+          </div>
           <div class="profile-label">
             <strong>${otherPublicId}</strong>
-            <small>${otherAlias || 'Ghost'}</small>
+            <small>${otherAlias || 'Ghost'}${isOnline ? ' · <span style="color:#4ade80">online</span>' : ''}</small>
           </div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
@@ -710,6 +721,30 @@ function connectWebSocket() {
         if (state.activeChatId === data.chat_id && !chatRoomOverlay.classList.contains('hidden')) {
           showTypingIndicator();
         }
+      } else if (data.type === 'presence') {
+        if (data.status === 'online') {
+          state.onlineUsers.add(data.public_id);
+        } else {
+          state.onlineUsers.delete(data.public_id);
+        }
+        renderChats();
+        if (state.activeChatRecipientPublicId === data.public_id) {
+          chatRoomStatus.textContent = data.status === 'online' ? 'Online' : 'Offline';
+          chatRoomStatus.style.color = data.status === 'online' ? '#4ade80' : 'var(--muted)';
+        }
+      } else if (data.type === 'pong') {
+        if (state.wsPingStart) {
+          const ms = Date.now() - state.wsPingStart;
+          state.wsPingStart = null;
+          appendTerminalLine(`  Reply from relay: time=${ms}ms  TTL=64`, 'terminal-line--output');
+          appendTerminalLine(`  Reply from relay: time=${ms + 1}ms  TTL=64`, 'terminal-line--output');
+          appendTerminalLine(`  Reply from relay: time=${ms - 1 > 0 ? ms - 1 : ms}ms  TTL=64`, 'terminal-line--output');
+          appendTerminalLine('', 'terminal-line--output');
+          appendTerminalLine(`  Avg latency: ${ms}ms — ${ms < 60 ? 'Connection is healthy.' : 'Relay responding.'}`, 'terminal-line--output');
+          terminalOutput.scrollTop = terminalOutput.scrollHeight;
+          terminalInput.disabled = false;
+          terminalInput.focus();
+        }
       }
     } catch (e) {
       console.warn('WS parse error:', e);
@@ -756,6 +791,7 @@ async function runTerminalCommand(cmd) {
   if (!cmd.trim()) return;
   appendTerminalInput(cmd);
   terminalInput.disabled = true;
+  let isWsPing = false;
 
   try {
     const result = await apiFetch('/api/terminal', {
@@ -763,26 +799,44 @@ async function runTerminalCommand(cmd) {
       body: JSON.stringify({ command: cmd, public_id: state.publicId }),
     });
 
-    if (result.clear) {
-      terminalOutput.innerHTML = '';
-    }
-
-    if (result.output && result.output.length > 0) {
-      await printTerminalLines(result.output, 28);
-    }
+    if (result.clear) terminalOutput.innerHTML = '';
+    if (result.output && result.output.length > 0) await printTerminalLines(result.output, 28);
 
     if (result.status === 'bld_active') {
       terminalInput.placeholder = '@ghost send <id> <message>';
     } else if (result.status === 'bld_exit') {
       terminalInput.placeholder = 'ghost help';
+    } else if (result.status === 'theme') {
+      applyTerminalTheme(result.extra.theme);
+    } else if (result.status === 'vault_redirect') {
+      setTimeout(() => showView('vaultView'), 400);
+      loadVault();
+    } else if (result.status === 'ws_ping') {
+      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        isWsPing = true;
+        state.wsPingStart = Date.now();
+        appendTerminalLine('  Pinging ghost-relay-eu-01...', 'terminal-line--output');
+        state.ws.send(JSON.stringify({ type: 'ping' }));
+      } else {
+        appendTerminalLine('  WebSocket not connected — relay unreachable.', 'terminal-line--error');
+      }
     }
   } catch (err) {
     appendTerminalLine(`  Error: ${err.message}`, 'terminal-line--error');
   } finally {
-    terminalInput.disabled = false;
-    terminalInput.focus();
-    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    if (!isWsPing) {
+      terminalInput.disabled = false;
+      terminalInput.focus();
+      terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
   }
+}
+
+function applyTerminalTheme(theme) {
+  const shell = document.getElementById('terminalShell');
+  if (!shell) return;
+  shell.className = `terminal-shell terminal-theme-${theme}`;
+  state.terminalTheme = theme;
 }
 
 // ── Event bindings ─────────────────────────────────────────────────────────
@@ -845,6 +899,8 @@ function bindEvents() {
     showView(item.dataset.target);
     if (item.dataset.target === 'chatsView') loadChats();
     if (item.dataset.target === 'terminalView') terminalInput.focus();
+    if (item.dataset.target === 'vaultView') loadVault();
+    if (item.dataset.target === 'marketView') loadMarket();
   }));
 
   globalSearch.addEventListener('input', () => {
@@ -926,11 +982,364 @@ async function initializeApp(identity) {
   renderConnections();
 }
 
+// ── Vault ──────────────────────────────────────────────────────────────────
+
+async function loadVault() {
+  if (!state.publicId) return;
+  try {
+    const files = await apiFetch(`/api/vault/${encodeURIComponent(state.publicId)}`);
+    state.vault = Array.isArray(files) ? files : [];
+    renderVault();
+  } catch (err) {
+    console.warn('Vault load failed:', err.message);
+    renderVault();
+  }
+}
+
+function renderVault() {
+  const list = document.getElementById('vaultFileList');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!state.vault.length) {
+    list.innerHTML = '<p class="empty-state">No files yet. Upload your first file above.</p>';
+    return;
+  }
+  state.vault.forEach(f => {
+    const card = document.createElement('div');
+    card.className = 'vault-file-card';
+    const icon = fileIcon(f.mime_type, f.original_name);
+    const size = formatBytes(f.size);
+    const date = f.created_at ? new Date(f.created_at).toLocaleDateString() : '';
+    card.innerHTML = `
+      <div class="vault-file-icon">${icon}</div>
+      <div class="vault-file-info">
+        <strong class="vault-file-name">${escapeHtml(f.original_name)}</strong>
+        <span class="vault-file-meta">${size} · ${f.mime_type.split('/')[0]} · ${date}</span>
+      </div>
+      <div class="vault-file-actions">
+        <a class="vault-file-btn" href="${f.url}" download="${encodeURIComponent(f.original_name)}" target="_blank">⬇</a>
+        <button class="vault-file-btn vault-file-btn--delete" data-id="${f.id}">🗑</button>
+      </div>
+    `;
+    card.querySelector('.vault-file-btn--delete').addEventListener('click', () => deleteVaultFile(f.id));
+    list.appendChild(card);
+  });
+}
+
+function fileIcon(mime, name) {
+  if (mime.startsWith('image/')) return '🖼️';
+  if (mime.startsWith('video/')) return '🎬';
+  if (mime.startsWith('audio/')) return '🎵';
+  if (mime.includes('pdf')) return '📄';
+  if (mime.includes('zip') || mime.includes('tar') || mime.includes('gzip')) return '📦';
+  const ext = (name || '').split('.').pop().toLowerCase();
+  if (['doc', 'docx'].includes(ext)) return '📝';
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊';
+  return '📁';
+}
+
+function formatBytes(b) {
+  if (!b) return '0 B';
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function uploadVaultFiles(files) {
+  if (!files || !files.length) return;
+  const bar = document.getElementById('vaultUploadBar');
+  const fill = document.getElementById('vaultUploadFill');
+  if (bar) bar.classList.remove('hidden');
+  let done = 0;
+  for (const file of Array.from(files)) {
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const resp = await fetch(`/api/vault/upload?public_id=${encodeURIComponent(state.publicId)}`, {
+        method: 'POST',
+        body: form,
+        credentials: 'same-origin',
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      const saved = await resp.json();
+      state.vault.unshift(saved);
+    } catch (err) {
+      console.warn('Upload failed:', err.message);
+      alert(`Upload failed for "${file.name}": ${err.message}`);
+    }
+    done++;
+    if (fill) fill.style.width = `${Math.round((done / files.length) * 100)}%`;
+  }
+  renderVault();
+  setTimeout(() => {
+    if (bar) bar.classList.add('hidden');
+    if (fill) fill.style.width = '0%';
+  }, 800);
+}
+
+async function deleteVaultFile(fileId) {
+  if (!confirm('Delete this file? This cannot be undone.')) return;
+  try {
+    await fetch(`/api/vault/${fileId}?public_id=${encodeURIComponent(state.publicId)}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    state.vault = state.vault.filter(f => f.id !== fileId);
+    renderVault();
+  } catch (err) {
+    console.warn('Delete failed:', err.message);
+  }
+}
+
+// ── Market ─────────────────────────────────────────────────────────────────
+
+async function loadMarket() {
+  if (!state.publicId) return;
+  try {
+    const [all, mine] = await Promise.all([
+      apiFetch('/api/market'),
+      apiFetch(`/api/market/mine/${encodeURIComponent(state.publicId)}`),
+    ]);
+    state.market = Array.isArray(all) ? all : [];
+    state.myStore = mine || null;
+    renderMyStorePanel();
+    renderMarket();
+  } catch (err) {
+    console.warn('Market load failed:', err.message);
+    renderMyStorePanel();
+    renderMarket();
+  }
+}
+
+function renderMyStorePanel() {
+  const panel = document.getElementById('myStorePanel');
+  if (!panel) return;
+  if (!state.myStore) {
+    panel.innerHTML = `
+      <div class="market-create-card">
+        <h3>Open Your Store</h3>
+        <p style="color:var(--muted);font-size:0.9rem;margin:0 0 1rem">Advertise your products — buyers contact you directly on WhatsApp or Facebook.</p>
+        <label class="vault-upload-zone vault-upload-zone--sm" id="storeLogoZone" for="storeLogoInput">
+          <div class="vault-upload-icon" style="font-size:1.6rem">🖼️</div>
+          <div class="vault-upload-text" style="font-size:0.85rem">Add store logo (optional)</div>
+          <input type="file" id="storeLogoInput" accept="image/*" hidden />
+        </label>
+        <img id="storeLogoPreview" class="market-img-preview hidden" alt="logo preview" />
+        <input type="text" id="storeNameInput" class="market-input" placeholder="Store name *" maxlength="64" />
+        <textarea id="storeDescInput" class="market-textarea" placeholder="Describe your store (optional)" rows="2"></textarea>
+        <input type="text" id="storeWaInput" class="market-input" placeholder="WhatsApp link (https://wa.me/...)" />
+        <input type="text" id="storeFbInput" class="market-input" placeholder="Facebook link (https://fb.com/...)" />
+        <button class="btn btn-primary" id="createStoreBtn">Create Store</button>
+      </div>
+    `;
+    let storeLogoUrl = '';
+    const logoInput = document.getElementById('storeLogoInput');
+    const logoPreview = document.getElementById('storeLogoPreview');
+    if (logoInput) {
+      logoInput.addEventListener('change', async () => {
+        const file = logoInput.files[0];
+        if (!file) return;
+        const form = new FormData();
+        form.append('file', file);
+        try {
+          const resp = await fetch('/api/market/upload', { method: 'POST', body: form, credentials: 'same-origin' });
+          const data = await resp.json();
+          storeLogoUrl = data.url;
+          logoPreview.src = storeLogoUrl;
+          logoPreview.classList.remove('hidden');
+          document.getElementById('storeLogoZone').querySelector('.vault-upload-text').textContent = file.name;
+        } catch (err) { console.warn('Logo upload failed:', err); }
+      });
+    }
+    const createBtn = document.getElementById('createStoreBtn');
+    if (createBtn) {
+      createBtn.addEventListener('click', async () => {
+        const name = (document.getElementById('storeNameInput').value || '').trim();
+        if (!name) { alert('Please enter a store name.'); return; }
+        createBtn.disabled = true;
+        createBtn.textContent = 'Creating...';
+        try {
+          const store = await apiFetch('/api/market/stores', {
+            method: 'POST',
+            body: JSON.stringify({
+              public_id: state.publicId,
+              name,
+              description: (document.getElementById('storeDescInput').value || '').trim(),
+              logo_url: storeLogoUrl,
+              whatsapp_link: (document.getElementById('storeWaInput').value || '').trim(),
+              facebook_link: (document.getElementById('storeFbInput').value || '').trim(),
+            }),
+          });
+          state.myStore = store;
+          state.market.unshift(store);
+          renderMyStorePanel();
+          renderMarket();
+        } catch (err) {
+          alert('Could not create store: ' + err.message);
+          createBtn.disabled = false;
+          createBtn.textContent = 'Create Store';
+        }
+      });
+    }
+  } else {
+    const s = state.myStore;
+    const logoHtml = s.logo_url
+      ? `<img src="${s.logo_url}" class="market-store-logo" alt="store logo" />`
+      : `<div class="market-store-logo-placeholder">🛒</div>`;
+    const linksHtml = [
+      s.whatsapp_link ? `<a class="market-contact-btn market-contact-btn--wa" href="${s.whatsapp_link}" target="_blank" rel="noopener">💬 WhatsApp</a>` : '',
+      s.facebook_link ? `<a class="market-contact-btn market-contact-btn--fb" href="${s.facebook_link}" target="_blank" rel="noopener">📘 Facebook</a>` : '',
+    ].filter(Boolean).join('');
+    const productsHtml = s.products && s.products.length
+      ? s.products.map(p => renderProductCard(p)).join('')
+      : '<p class="empty-state" style="padding:1rem">No products yet. Add your first product below.</p>';
+    panel.innerHTML = `
+      <div class="market-my-store-card">
+        <div class="market-store-header">
+          ${logoHtml}
+          <div class="market-store-info">
+            <h3>${escapeHtml(s.name)}</h3>
+            ${s.description ? `<p>${escapeHtml(s.description)}</p>` : ''}
+            <div class="market-contact-row">${linksHtml}</div>
+          </div>
+        </div>
+        <div class="market-products-label">Your Products <button class="btn btn-primary market-add-product-btn" id="openAddProduct" style="font-size:0.8rem;padding:0.5rem 1rem">+ Add Product</button></div>
+        <div class="market-products-grid">${productsHtml}</div>
+      </div>
+    `;
+    const addBtn = document.getElementById('openAddProduct');
+    if (addBtn) addBtn.addEventListener('click', openAddProductModal);
+  }
+}
+
+function renderProductCard(p) {
+  const imgHtml = p.image_url
+    ? `<img src="${p.image_url}" class="market-product-img" alt="${escapeHtml(p.name)}" />`
+    : `<div class="market-product-img market-product-img--placeholder">📦</div>`;
+  return `
+    <div class="market-product-card">
+      ${imgHtml}
+      <div class="market-product-body">
+        <strong>${escapeHtml(p.name)}</strong>
+        ${p.description ? `<p>${escapeHtml(p.description)}</p>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderMarket() {
+  const grid = document.getElementById('marketStoreList');
+  if (!grid) return;
+  const others = state.market.filter(s => s.owner_public_id !== state.publicId);
+  grid.innerHTML = '';
+  if (!others.length) {
+    grid.innerHTML = '<p class="empty-state">No other stores yet. Be the first to open one!</p>';
+    return;
+  }
+  others.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'market-store-card';
+    const logoHtml = s.logo_url
+      ? `<img src="${s.logo_url}" class="market-store-logo" alt="logo" />`
+      : `<div class="market-store-logo-placeholder">🛒</div>`;
+    const linksHtml = [
+      s.whatsapp_link ? `<a class="market-contact-btn market-contact-btn--wa" href="${s.whatsapp_link}" target="_blank" rel="noopener">💬 WhatsApp</a>` : '',
+      s.facebook_link ? `<a class="market-contact-btn market-contact-btn--fb" href="${s.facebook_link}" target="_blank" rel="noopener">📘 Facebook</a>` : '',
+    ].filter(Boolean).join('');
+    const productsHtml = s.products && s.products.length
+      ? s.products.map(p => renderProductCard(p)).join('')
+      : '';
+    card.innerHTML = `
+      <div class="market-store-header">
+        ${logoHtml}
+        <div class="market-store-info">
+          <h3>${escapeHtml(s.name)}</h3>
+          <small style="color:var(--muted)">${s.owner_alias || s.owner_public_id}</small>
+          ${s.description ? `<p>${escapeHtml(s.description)}</p>` : ''}
+          <div class="market-contact-row">${linksHtml}</div>
+        </div>
+      </div>
+      ${productsHtml ? `<div class="market-products-grid">${productsHtml}</div>` : ''}
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function openAddProductModal() {
+  state.marketProductImageUrl = '';
+  const modal = document.getElementById('addProductModal');
+  if (!modal) return;
+  document.getElementById('productNameInput').value = '';
+  document.getElementById('productDescInput').value = '';
+  document.getElementById('productImgPreview').classList.add('hidden');
+  document.getElementById('productImgPreview').src = '';
+  modal.classList.remove('hidden');
+}
+
+function bindMarketModal() {
+  const modal = document.getElementById('addProductModal');
+  const closeBtn = document.getElementById('addProductClose');
+  const imgInput = document.getElementById('productImgInput');
+  const saveBtn = document.getElementById('addProductSaveBtn');
+  if (!modal) return;
+  if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+  if (imgInput) {
+    imgInput.addEventListener('change', async () => {
+      const file = imgInput.files[0];
+      if (!file) return;
+      const form = new FormData();
+      form.append('file', file);
+      try {
+        const resp = await fetch('/api/market/upload', { method: 'POST', body: form, credentials: 'same-origin' });
+        const data = await resp.json();
+        state.marketProductImageUrl = data.url;
+        const preview = document.getElementById('productImgPreview');
+        preview.src = data.url;
+        preview.classList.remove('hidden');
+        document.getElementById('productImgLabel').querySelector('.vault-upload-text').textContent = file.name;
+      } catch (err) { console.warn('Product image upload failed:', err); }
+    });
+  }
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      if (!state.myStore) return;
+      const name = (document.getElementById('productNameInput').value || '').trim();
+      if (!name) { alert('Product name is required.'); return; }
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+      try {
+        const product = await apiFetch(`/api/market/stores/${state.myStore.id}/products`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name,
+            description: (document.getElementById('productDescInput').value || '').trim(),
+            image_url: state.marketProductImageUrl || '',
+          }),
+        });
+        if (!state.myStore.products) state.myStore.products = [];
+        state.myStore.products.push(product);
+        state.market = state.market.map(s => s.id === state.myStore.id ? state.myStore : s);
+        modal.classList.add('hidden');
+        renderMyStorePanel();
+        renderMarket();
+      } catch (err) {
+        alert('Could not add product: ' + err.message);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Add Product';
+      }
+    });
+  }
+}
+
 function startApp() {
   loadAvatarOptions();
   generatePublicId();
   generatePrivateId();
   bindEvents();
+  bindVaultEvents();
+  bindMarketModal();
 
   const identity = loadIdentity();
   if (identity) {
@@ -940,6 +1349,18 @@ function startApp() {
 
   showScreen('splash');
   setTimeout(() => showScreen('welcome'), 2200);
+}
+
+function bindVaultEvents() {
+  const fileInput = document.getElementById('vaultFileInput');
+  if (fileInput) {
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files && fileInput.files.length) {
+        uploadVaultFiles(fileInput.files);
+        fileInput.value = '';
+      }
+    });
+  }
 }
 
 startApp();

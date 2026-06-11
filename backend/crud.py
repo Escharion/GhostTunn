@@ -166,6 +166,88 @@ async def get_messages(session: AsyncSession, chat_id: int, limit: int = 100):
     return result.scalars().all()
 
 
+async def get_vault_files(session: AsyncSession, public_id: str):
+    user = await get_user_by_public(session, public_id)
+    if not user:
+        return []
+    from models import VaultFile
+    stmt = select(VaultFile).where(VaultFile.owner_id == user.id).order_by(VaultFile.created_at.desc())
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+
+async def create_vault_file(session: AsyncSession, public_id: str, filename: str, original_name: str, mime_type: str, size: int):
+    from models import VaultFile
+    user = await get_user_by_public(session, public_id)
+    if not user:
+        raise ValueError("User not found")
+    vf = VaultFile(owner_id=user.id, filename=filename, original_name=original_name, mime_type=mime_type, size=size)
+    session.add(vf)
+    await session.commit()
+    await session.refresh(vf)
+    return vf
+
+
+async def delete_vault_file(session: AsyncSession, file_id: int, public_id: str):
+    from models import VaultFile
+    user = await get_user_by_public(session, public_id)
+    if not user:
+        raise ValueError("User not found")
+    vf = await session.get(VaultFile, file_id)
+    if not vf or vf.owner_id != user.id:
+        raise ValueError("File not found or not yours")
+    await session.delete(vf)
+    await session.commit()
+    return vf
+
+
+async def get_stores(session: AsyncSession):
+    from models import Store
+    from sqlalchemy.orm import selectinload as sil
+    stmt = select(Store).options(sil(Store.owner), sil(Store.products)).order_by(Store.created_at.desc())
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+
+async def get_my_store(session: AsyncSession, public_id: str):
+    from models import Store
+    from sqlalchemy.orm import selectinload as sil
+    user = await get_user_by_public(session, public_id)
+    if not user:
+        return None
+    stmt = select(Store).where(Store.owner_id == user.id).options(sil(Store.owner), sil(Store.products)).limit(1)
+    result = await session.execute(stmt)
+    return result.scalars().first()
+
+
+async def create_store(session: AsyncSession, public_id: str, name: str, description: str, logo_url: str, whatsapp_link: str, facebook_link: str):
+    from models import Store
+    user = await get_user_by_public(session, public_id)
+    if not user:
+        raise ValueError("User not found")
+    store = Store(owner_id=user.id, name=name, description=description, logo_url=logo_url,
+                  whatsapp_link=whatsapp_link, facebook_link=facebook_link)
+    session.add(store)
+    await session.commit()
+    from sqlalchemy.orm import selectinload as sil
+    stmt = select(Store).where(Store.id == store.id).options(sil(Store.owner), sil(Store.products))
+    result = await session.execute(stmt)
+    return result.scalars().first()
+
+
+async def add_product(session: AsyncSession, store_id: int, name: str, description: str, image_url: str):
+    from models import Product, Store
+    from sqlalchemy.orm import selectinload as sil
+    store = await session.get(Store, store_id)
+    if not store:
+        raise ValueError("Store not found")
+    product = Product(store_id=store_id, name=name, description=description, image_url=image_url)
+    session.add(product)
+    await session.commit()
+    await session.refresh(product)
+    return product
+
+
 async def mark_messages_read(session: AsyncSession, chat_id: int, reader_public_id: str):
     reader = await get_user_by_public(session, reader_public_id)
     if not reader:

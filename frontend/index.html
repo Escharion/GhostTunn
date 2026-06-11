@@ -133,7 +133,7 @@
       </section>
 
       <section id="terminalView" class="content-view hidden">
-        <div class="terminal-shell">
+        <div class="terminal-shell" id="terminalShell">
           <div class="terminal-header">
             <span class="terminal-dot terminal-dot--red"></span>
             <span class="terminal-dot terminal-dot--yellow"></span>
@@ -149,6 +149,64 @@
           </div>
         </div>
       </section>
+
+      <!-- ── Vault ──────────────────────────────────────────── -->
+      <section id="vaultView" class="content-view hidden">
+        <div class="section-title">
+          <h2>Vault</h2>
+          <p>Your private file storage. Upload any file — it stays yours.</p>
+        </div>
+        <label class="vault-upload-zone" id="vaultUploadZone" for="vaultFileInput">
+          <div class="vault-upload-icon">📁</div>
+          <div class="vault-upload-text">Tap to upload a file</div>
+          <div class="vault-upload-hint">Any file type — images, docs, audio, video</div>
+          <input type="file" id="vaultFileInput" hidden multiple />
+        </label>
+        <div class="vault-upload-bar hidden" id="vaultUploadBar">
+          <div class="vault-upload-bar-fill" id="vaultUploadFill"></div>
+        </div>
+        <div id="vaultFileList" class="vault-file-list"></div>
+      </section>
+
+      <!-- ── Market ─────────────────────────────────────────── -->
+      <section id="marketView" class="content-view hidden">
+        <div class="section-title">
+          <h2>Market</h2>
+          <p>Ghost storefronts. Browse, discover, and connect directly — no trading happens here.</p>
+        </div>
+
+        <!-- My store panel -->
+        <div id="myStorePanel">
+          <!-- Filled by JS — either create form or manage panel -->
+        </div>
+
+        <!-- All stores -->
+        <div class="section-title" id="allStoresTitle" style="margin-top:0">
+          <h3 style="font-size:1.1rem;color:var(--muted)">All Stores</h3>
+        </div>
+        <div id="marketStoreList" class="market-store-grid"></div>
+      </section>
+
+      <!-- Product Upload Modal -->
+      <div id="addProductModal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3>Add Product</h3>
+            <button class="modal-close" id="addProductClose">✕</button>
+          </div>
+          <div class="market-form-group">
+            <label class="vault-upload-zone vault-upload-zone--sm" id="productImgLabel" for="productImgInput">
+              <div class="vault-upload-icon" style="font-size:1.5rem">🖼️</div>
+              <div class="vault-upload-text" style="font-size:0.85rem">Add product image</div>
+              <input type="file" id="productImgInput" accept="image/*" hidden />
+            </label>
+            <img id="productImgPreview" class="market-img-preview hidden" alt="product preview" />
+          </div>
+          <input type="text" id="productNameInput" class="market-input" placeholder="Product name" maxlength="64" />
+          <textarea id="productDescInput" class="market-textarea" placeholder="Product description" rows="3"></textarea>
+          <button class="btn btn-primary" id="addProductSaveBtn" style="width:100%">Add Product</button>
+        </div>
+      </div>
 
       <section id="accountView" class="content-view hidden">
         <div class="section-title"><h2>Account</h2><p>Profile settings and privacy controls.</p></div>
@@ -175,11 +233,13 @@
     </div>
 
     <nav class="bottom-nav">
-      <button class="nav-item nav-item--active" data-target="homeView">🏠 Home</button>
-      <button class="nav-item" data-target="chatsView">💬 Chats</button>
-      <button class="nav-item" data-target="idsView">🆔 IDs</button>
-      <button class="nav-item" data-target="terminalView">⌨️ Shell</button>
-      <button class="nav-item" data-target="accountView">👤 Account</button>
+      <button class="nav-item nav-item--active" data-target="homeView">🏠<span class="nav-label">Home</span></button>
+      <button class="nav-item" data-target="chatsView">💬<span class="nav-label">Chats</span></button>
+      <button class="nav-item" data-target="idsView">🆔<span class="nav-label">IDs</span></button>
+      <button class="nav-item" data-target="terminalView">⌨️<span class="nav-label">Shell</span></button>
+      <button class="nav-item" data-target="vaultView">🗄️<span class="nav-label">Vault</span></button>
+      <button class="nav-item" data-target="marketView">🛒<span class="nav-label">Market</span></button>
+      <button class="nav-item" data-target="accountView">👤<span class="nav-label">Account</span></button>
     </nav>
   </div>
 

@@ -1,7 +1,10 @@
 import os
+import time
+import uuid
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+import aiofiles
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -9,17 +12,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import Settings
 from crud import (
+    add_product,
     create_chat,
     create_identity,
     create_message,
     create_post,
+    create_store,
+    create_vault_file,
+    delete_vault_file,
     get_feed,
     get_liked_post_ids,
     get_messages,
+    get_my_store,
     get_notifications,
+    get_stores,
     get_user_by_private,
     get_user_by_public,
     get_user_chats,
+    get_vault_files,
     mark_messages_read,
     toggle_like,
 )
@@ -53,6 +63,12 @@ app.add_middleware(
 project_dir = Path(__file__).resolve().parents[1]
 frontend_dir = project_dir / "frontend"
 app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
+
+
+UPLOADS_DIR = Path(__file__).resolve().parent / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 
 @app.on_event("startup")
@@ -376,3 +392,165 @@ async def notifications(public_id: str, session: AsyncSession = Depends(get_sess
         )
         for notification in notifications
     ]
+
+
+# ── Vault ───────────────────────────────────────────────────────────────────
+
+@app.get("/api/vault/{public_id}")
+async def list_vault(public_id: str, session: AsyncSession = Depends(get_session)):
+    files = await get_vault_files(session, public_id)
+    return [
+        {
+            "id": f.id,
+            "original_name": f.original_name,
+            "filename": f.filename,
+            "mime_type": f.mime_type,
+            "size": f.size,
+            "url": f"/uploads/{f.filename}",
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+        }
+        for f in files
+    ]
+
+
+@app.post("/api/vault/upload")
+async def vault_upload(
+    public_id: str,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+):
+    ext = Path(file.filename or "file").suffix or ""
+    safe_name = f"{uuid.uuid4().hex}{ext}"
+    dest = UPLOADS_DIR / safe_name
+    try:
+        contents = await file.read()
+        async with aiofiles.open(dest, "wb") as out:
+            await out.write(contents)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    vf = await create_vault_file(
+        session,
+        public_id=public_id,
+        filename=safe_name,
+        original_name=file.filename or safe_name,
+        mime_type=file.content_type or "application/octet-stream",
+        size=len(contents),
+    )
+    return {
+        "id": vf.id,
+        "original_name": vf.original_name,
+        "filename": vf.filename,
+        "mime_type": vf.mime_type,
+        "size": vf.size,
+        "url": f"/uploads/{vf.filename}",
+        "created_at": vf.created_at.isoformat() if vf.created_at else None,
+    }
+
+
+@app.delete("/api/vault/{file_id}")
+async def vault_delete(file_id: int, public_id: str, session: AsyncSession = Depends(get_session)):
+    try:
+        vf = await delete_vault_file(session, file_id, public_id)
+        dest = UPLOADS_DIR / vf.filename
+        if dest.exists():
+            dest.unlink()
+        return {"deleted": True}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+# ── Market ──────────────────────────────────────────────────────────────────
+
+def _store_to_dict(s) -> dict:
+    return {
+        "id": s.id,
+        "name": s.name,
+        "logo_url": s.logo_url,
+        "description": s.description,
+        "whatsapp_link": s.whatsapp_link,
+        "facebook_link": s.facebook_link,
+        "owner_public_id": s.owner.public_id,
+        "owner_alias": s.owner.alias,
+        "created_at": s.created_at.isoformat() if s.created_at else None,
+        "products": [
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "image_url": p.image_url,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+            }
+            for p in s.products
+        ],
+    }
+
+
+@app.post("/api/market/upload")
+async def market_image_upload(file: UploadFile = File(...)):
+    ext = Path(file.filename or "img").suffix or ".jpg"
+    safe_name = f"{uuid.uuid4().hex}{ext}"
+    dest = UPLOADS_DIR / safe_name
+    try:
+        contents = await file.read()
+        async with aiofiles.open(dest, "wb") as out:
+            await out.write(contents)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return {"url": f"/uploads/{safe_name}"}
+
+
+@app.get("/api/market")
+async def market_all(session: AsyncSession = Depends(get_session)):
+    stores = await get_stores(session)
+    return [_store_to_dict(s) for s in stores]
+
+
+@app.get("/api/market/mine/{public_id}")
+async def market_mine(public_id: str, session: AsyncSession = Depends(get_session)):
+    s = await get_my_store(session, public_id)
+    if not s:
+        return None
+    return _store_to_dict(s)
+
+
+@app.post("/api/market/stores")
+async def market_create_store(payload: dict, session: AsyncSession = Depends(get_session)):
+    try:
+        s = await create_store(
+            session,
+            public_id=payload.get("public_id", ""),
+            name=(payload.get("name") or "").strip(),
+            description=(payload.get("description") or "").strip(),
+            logo_url=(payload.get("logo_url") or "").strip(),
+            whatsapp_link=(payload.get("whatsapp_link") or "").strip(),
+            facebook_link=(payload.get("facebook_link") or "").strip(),
+        )
+        return _store_to_dict(s)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/market/stores/{store_id}/products")
+async def market_add_product(store_id: int, payload: dict, session: AsyncSession = Depends(get_session)):
+    try:
+        p = await add_product(
+            session,
+            store_id=store_id,
+            name=(payload.get("name") or "").strip(),
+            description=(payload.get("description") or "").strip(),
+            image_url=(payload.get("image_url") or "").strip(),
+        )
+        return {
+            "id": p.id,
+            "name": p.name,
+            "description": p.description,
+            "image_url": p.image_url,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/api/online")
+async def online_users():
+    return {"online": list(manager.online_ids)}
