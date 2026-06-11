@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -39,6 +40,12 @@ from backend.schemas import (
 from backend.utils import get_avatar_choices
 from backend.terminal import router as terminal_router
 from backend.websocket_manager import manager
+
+project_dir = Path(__file__).resolve().parents[1]
+# If running `uvicorn app:app` from the `backend/` folder, ensure the
+# repository root is on sys.path so the `backend` package imports work.
+if str(project_dir) not in sys.path:
+    sys.path.insert(0, str(project_dir))
 
 settings = Settings()
 
