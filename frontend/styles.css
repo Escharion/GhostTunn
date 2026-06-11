@@ -597,6 +597,42 @@ code {
   background: rgba(244, 193, 83, 0.12);
 }
 
+.nav-item {
+  position: relative;
+}
+
+.nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  background: #e53935;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  pointer-events: none;
+}
+
+.unread-badge {
+  background: #e53935;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+}
+
 /* ── Chat Room Overlay ──────────────────────────────────── */
 
 .chat-room-overlay {

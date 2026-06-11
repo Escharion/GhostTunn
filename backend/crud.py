@@ -127,6 +127,7 @@ async def get_user_chats(session: AsyncSession, public_id: str):
     stmt = (
         select(Chat)
         .where((Chat.user_a_id == user.id) | (Chat.user_b_id == user.id))
+        .options(selectinload(Chat.user_a), selectinload(Chat.user_b))
         .order_by(Chat.created_at.desc())
     )
     result = await session.execute(stmt)

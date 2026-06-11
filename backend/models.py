@@ -61,6 +61,8 @@ class Chat(Base):
     active = Column(Boolean, default=True)
 
     messages = relationship("Message", back_populates="chat", cascade="all, delete")
+    user_a = relationship("User", foreign_keys=[user_a_id])
+    user_b = relationship("User", foreign_keys=[user_b_id])
 
 
 class Message(Base):

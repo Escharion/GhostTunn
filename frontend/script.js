@@ -77,6 +77,7 @@ const state = {
   activeChatRecipientAvatar: '👻',
   ws: null,
   wsReconnectTimer: null,
+  unreadCounts: {},
 };
 
 function showScreen(name) {
@@ -402,26 +403,39 @@ function renderFeed() {
 function renderChats() {
   chatList.innerHTML = '';
   if (state.chats.length === 0) {
-    chatList.innerHTML = '<p class="empty-state">No chats yet. Start one above.</p>';
+    chatList.innerHTML = '<p class="empty-state">No chats yet. Enter a Ghost ID above to start one.</p>';
     return;
   }
   state.chats.forEach(chat => {
-    const otherId = chat.user_a_id === state.publicId ? chat.user_b_id : chat.user_b_id;
+    const isA = chat.user_a_public_id === state.publicId;
+    const otherPublicId = isA ? chat.user_b_public_id : chat.user_a_public_id;
+    const otherAlias = isA ? chat.user_b_alias : chat.user_a_alias;
+    const otherAvatarFull = isA ? chat.user_b_avatar : chat.user_a_avatar;
+    const otherAvatar = otherAvatarFull ? otherAvatarFull.split(' ')[0] : '👻';
+    const unread = state.unreadCounts[chat.chat_id] || 0;
+
     const item = document.createElement('article');
     item.className = 'chat-card';
     item.innerHTML = `
       <header>
         <div class="profile">
-          <span class="profile-avatar">👻</span>
+          <span class="profile-avatar">${otherAvatar}</span>
           <div class="profile-label">
-            <strong>Chat #${chat.chat_id}</strong>
-            <small>Tap to open</small>
+            <strong>${otherPublicId}</strong>
+            <small>${otherAlias || 'Ghost'}</small>
           </div>
         </div>
-        <span class="timestamp">${new Date(chat.created_at).toLocaleDateString()}</span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="timestamp">${new Date(chat.created_at).toLocaleDateString()}</span>
+          ${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}
+        </div>
       </header>
     `;
-    item.addEventListener('click', () => openChatRoom(chat.chat_id, null, null, '👻'));
+    item.addEventListener('click', () => {
+      state.unreadCounts[chat.chat_id] = 0;
+      updateChatBadge();
+      openChatRoom(chat.chat_id, otherPublicId, otherAlias, otherAvatar);
+    });
     chatList.appendChild(item);
   });
 }
@@ -522,7 +536,7 @@ function escapeHtml(str) {
 
 async function sendChatMessage() {
   const content = chatRoomInput.value.trim();
-  if (!content || !state.activeChatId) return;
+  if (!content || !state.activeChatId || !state.activeChatRecipientPublicId) return;
   chatRoomInput.value = '';
   chatRoomInput.style.height = 'auto';
 
@@ -530,28 +544,28 @@ async function sendChatMessage() {
   appendChatMessage(optimistic.sender_public_id, optimistic.content, optimistic.created_at);
   scrollChatToBottom();
 
-  if (state.ws && state.ws.readyState === WebSocket.OPEN && state.activeChatRecipientPublicId) {
-    state.ws.send(JSON.stringify({
-      type: 'message',
-      chat_id: state.activeChatId,
-      sender_public_id: state.publicId,
-      recipient_public_id: state.activeChatRecipientPublicId,
-      content,
-    }));
-  } else {
-    try {
-      await apiFetch('/api/messages', {
-        method: 'POST',
-        body: JSON.stringify({
-          chat_id: state.activeChatId,
-          sender_public_id: state.publicId,
-          recipient_public_id: state.activeChatRecipientPublicId || state.publicId,
-          content,
-        }),
-      });
-    } catch (err) {
-      console.warn('Message send failed:', err.message);
+  try {
+    const saved = await apiFetch('/api/messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        chat_id: state.activeChatId,
+        sender_public_id: state.publicId,
+        recipient_public_id: state.activeChatRecipientPublicId,
+        content,
+      }),
+    });
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        type: 'message',
+        chat_id: saved.chat_id,
+        sender_public_id: saved.sender_public_id,
+        recipient_public_id: saved.recipient_public_id,
+        content: saved.content,
+        created_at: saved.created_at,
+      }));
     }
+  } catch (err) {
+    console.warn('Message send failed:', err.message);
   }
 }
 
@@ -574,6 +588,23 @@ async function startNewChat() {
 
 // ── WebSocket ──────────────────────────────────────────────────────────────
 
+function updateChatBadge() {
+  const total = Object.values(state.unreadCounts).reduce((a, b) => a + b, 0);
+  const chatNavItem = document.querySelector('.nav-item[data-target="chatsView"]');
+  if (!chatNavItem) return;
+  let badge = chatNavItem.querySelector('.nav-badge');
+  if (total > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'nav-badge';
+      chatNavItem.appendChild(badge);
+    }
+    badge.textContent = total;
+  } else if (badge) {
+    badge.remove();
+  }
+}
+
 function connectWebSocket() {
   if (!state.publicId) return;
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -581,22 +612,26 @@ function connectWebSocket() {
   const ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
-    console.log('WS connected');
     state.ws = ws;
     if (state.wsReconnectTimer) {
       clearTimeout(state.wsReconnectTimer);
       state.wsReconnectTimer = null;
     }
+    if (chatRoomStatus) chatRoomStatus.textContent = 'Connected';
     ws.send(JSON.stringify({ type: 'ping' }));
   };
 
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      if (data.type === 'message') {
-        if (state.activeChatId === data.chat_id && data.sender_public_id !== state.publicId) {
+      if (data.type === 'message' && data.sender_public_id !== state.publicId) {
+        if (state.activeChatId === data.chat_id && !chatRoomOverlay.classList.contains('hidden')) {
           appendChatMessage(data.sender_public_id, data.content, data.created_at);
           scrollChatToBottom();
+        } else {
+          state.unreadCounts[data.chat_id] = (state.unreadCounts[data.chat_id] || 0) + 1;
+          updateChatBadge();
+          renderChats();
         }
       }
     } catch (e) {
@@ -606,6 +641,7 @@ function connectWebSocket() {
 
   ws.onclose = () => {
     state.ws = null;
+    if (chatRoomStatus) chatRoomStatus.textContent = 'Reconnecting...';
     state.wsReconnectTimer = setTimeout(connectWebSocket, 3000);
   };
 

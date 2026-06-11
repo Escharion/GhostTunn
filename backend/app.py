@@ -229,8 +229,12 @@ async def chats_for_user(public_id: str, session: AsyncSession = Depends(get_ses
     for chat in chats:
         result.append({
             "chat_id": chat.id,
-            "user_a_id": chat.user_a_id,
-            "user_b_id": chat.user_b_id,
+            "user_a_public_id": chat.user_a.public_id,
+            "user_b_public_id": chat.user_b.public_id,
+            "user_a_avatar": chat.user_a.avatar,
+            "user_b_avatar": chat.user_b.avatar,
+            "user_a_alias": chat.user_a.alias,
+            "user_b_alias": chat.user_b.alias,
             "created_at": chat.created_at,
             "active": chat.active,
         })
