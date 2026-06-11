@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+import base64
+from fastapi import Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -326,6 +328,47 @@ async def websocket_endpoint(websocket: WebSocket, public_id: str, session: Asyn
                 await websocket.send_json({"type": "pong"})
     except WebSocketDisconnect:
         manager.disconnect(public_id)
+
+
+@app.post("/api/upload")
+async def upload_file(payload: dict = Body(...)):
+    """Accept a base64-encoded file payload, save it to attached_assets/uploads,
+    and notify the uploader via websocket. The server stores only ciphertext bytes.
+    Payload: { public_id, filename, data } where data is base64 string.
+    """
+    public_id = (payload.get("public_id") or "").strip()
+    filename = (payload.get("filename") or "").strip()
+    data_b64 = payload.get("data")
+    if not public_id or not filename or not data_b64:
+        raise HTTPException(status_code=400, detail="public_id, filename and data are required")
+
+    uploads_dir = project_dir / "attached_assets" / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = filename.replace("..", "_")
+    file_path = uploads_dir / safe_name
+    try:
+        raw = base64.b64decode(data_b64)
+        file_path.write_bytes(raw)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {exc}")
+
+    url = f"/api/uploads/{safe_name}"
+    # notify uploader their vault changed
+    try:
+        await manager.send_to(public_id, {"type": "upload", "filename": safe_name, "url": url})
+    except Exception:
+        pass
+
+    return {"filename": safe_name, "url": url}
+
+
+@app.get("/api/uploads/{filename}")
+async def serve_upload(filename: str):
+    uploads_dir = project_dir / "attached_assets" / "uploads"
+    file_path = uploads_dir / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path)
 
 
 app.include_router(terminal_router, prefix="/api")

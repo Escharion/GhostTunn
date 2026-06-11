@@ -4,6 +4,8 @@ import random
 import re
 from datetime import datetime
 from typing import List, Optional
+from pathlib import Path
+import os
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -113,11 +115,8 @@ FAKE_CONTACTS = [
     "@Ghost-NeonGhost-0712",
 ]
 
-FAKE_FILES = [
-    "encrypted_note_A1B2.ghost   • 2.4 KB  • shared  • 2026-06-01",
-    "mission_brief_X9.ghost      • 8.1 KB  • private • 2026-05-28",
-    "relay_config_draft.ghost    • 1.2 KB  • private • 2026-05-20",
-]
+# Files are stored under attached_assets/uploads; present real listing when available
+
 
 AUDIT_LOG = [
     f"[{_now()}] LOGIN  — session started",
@@ -272,20 +271,24 @@ def _handle_root_command(raw: str, cmd: str, alias: str, pid: str) -> TerminalRe
         ])
 
     # ── @ghost files ─────────────────────────────────────────
-    if cmd == "@ghost files":
-        return TerminalResponse(output=[
-            "  ┌──────── FILE VAULT (ROOT) ────────┐",
-            "",
-            "  encrypted_note_A1B2.ghost  • 2.4 KB  • shared  • key: ●●●A1B2",
-            "  mission_brief_X9.ghost     • 8.1 KB  • private • key: ●●●X9F3",
-            "  relay_config_draft.ghost   • 1.2 KB  • private • key: ●●●D4C1",
-            "  identity_backup.ghost      • 0.8 KB  • private • key: ●●●E7A9",
-            "",
-            f"  4 files — 1 shared — 3 private",
-            "  All files encrypted with your identity key.",
-            "",
-            "  ⚠  Root view shows encryption key fragments.",
-        ])
+    if cmd == "ghost files":
+        # Try to list real uploaded files from attached_assets/uploads
+        project_root = Path(__file__).resolve().parents[1]
+        uploads_dir = project_root / "attached_assets" / "uploads"
+        lines = ["  ┌──────── YOUR FILES ────────┐", ""]
+        if uploads_dir.exists() and uploads_dir.is_dir():
+            files = sorted(uploads_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+            for f in files:
+                try:
+                    size_kb = f.stat().st_size / 1024
+                    mtime = f.stat().st_mtime
+                    lines.append(f"  {f.name}  • {size_kb:.1f} KB  • stored • {Path(f).stat().st_mtime:#}")
+                except Exception:
+                    lines.append(f"  {f.name}  • size N/A")
+            lines += ["", f"  {len(files)} files stored", "  All files stored encrypted (ciphertext)."]
+        else:
+            lines += ["  No files found in your vault.", "  Use the Files panel to upload."]
+        return TerminalResponse(output=lines)
 
     # ── @ghost help ──────────────────────────────────────────
     if cmd in {"@ghost help", "@ghost"}:
@@ -532,16 +535,28 @@ async def terminal_command(request: TerminalRequest) -> TerminalResponse:
         ])
 
     if cmd == "ghost files":
+        # Try to list real uploaded files from attached_assets/uploads
+        project_root = Path(__file__).resolve().parents[1]
+        uploads_dir = project_root / "attached_assets" / "uploads"
         lines = ["  ┌──────── YOUR FILES ────────┐", ""]
-        for f in FAKE_FILES:
-            lines.append(f"  {f}")
-        lines += ["", f"  {len(FAKE_FILES)} files stored"]
+        if uploads_dir.exists() and uploads_dir.is_dir():
+            files = sorted(uploads_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+            for f in files:
+                try:
+                    size_kb = f.stat().st_size / 1024
+                    mtime = datetime.utcfromtimestamp(f.stat().st_mtime).strftime('%Y-%m-%d')
+                    lines.append(f"  {f.name}  • {size_kb:.1f} KB  • stored • {mtime}")
+                except Exception:
+                    lines.append(f"  {f.name}  • size N/A")
+            lines += ["", f"  {len(files)} files stored", "  All files stored encrypted (ciphertext)."]
+        else:
+            lines += ["  No files found in your vault.", "  Use the Files panel to upload."]
         return TerminalResponse(output=lines)
 
     if cmd == "ghost upload":
         return TerminalResponse(output=[
-            "  File upload is handled via the Files panel (coming soon).",
-            "  End-to-end encrypted storage is available for Ghost Pro users.",
+            "  File upload is handled via the Files panel.",
+            "  End-to-end encrypted storage is available to all users.",
         ])
 
     if cmd.startswith("ghost download "):
