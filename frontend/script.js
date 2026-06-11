@@ -505,12 +505,13 @@ async function openChatRoom(chatId, recipientPublicId, recipientAlias, recipient
 
   try {
     const messages = await apiFetch(`/api/messages/${chatId}`);
-    messages.forEach(msg => appendChatMessage(msg.sender_public_id, msg.content, msg.created_at));
+    messages.forEach(msg => appendChatMessage(msg.sender_public_id, msg.content, msg.created_at, msg.id, msg.read));
   } catch (err) {
     console.warn('Could not load messages:', err.message);
   }
   scrollChatToBottom();
   chatRoomInput.focus();
+  setTimeout(markChatRead, 500);
 }
 
 function closeChatRoom() {
@@ -519,13 +520,38 @@ function closeChatRoom() {
   state.activeChatId = null;
 }
 
-function appendChatMessage(senderPublicId, content, createdAt) {
+function appendChatMessage(senderPublicId, content, createdAt, msgId, read) {
   const isMine = senderPublicId === state.publicId;
   const bubble = document.createElement('div');
   bubble.className = `chat-bubble ${isMine ? 'chat-bubble--mine' : 'chat-bubble--theirs'}`;
+  if (msgId) bubble.dataset.msgId = msgId;
   const time = createdAt ? new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-  bubble.innerHTML = `<span class="bubble-text">${escapeHtml(content)}</span><span class="bubble-time">${time}</span>`;
+  const tickHtml = isMine
+    ? `<span class="bubble-tick ${read ? 'bubble-tick--read' : ''}">
+         <svg viewBox="0 0 18 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+           <path d="M1 5l3.5 3.5L11 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+           <path d="M7 5l3.5 3.5L17 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+         </svg>
+       </span>`
+    : '';
+  bubble.innerHTML = `<span class="bubble-text">${escapeHtml(content)}</span><span class="bubble-meta">${time}${tickHtml}</span>`;
   chatRoomMessages.appendChild(bubble);
+}
+
+function markChatRead() {
+  if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+  if (!state.activeChatId) return;
+  state.ws.send(JSON.stringify({
+    type: 'read',
+    chat_id: state.activeChatId,
+    reader_public_id: state.publicId,
+  }));
+}
+
+function updateTicksToRead() {
+  chatRoomMessages.querySelectorAll('.chat-bubble--mine .bubble-tick').forEach(tick => {
+    tick.classList.add('bubble-tick--read');
+  });
 }
 
 function scrollChatToBottom() {
@@ -556,13 +582,17 @@ async function sendChatMessage() {
         content,
       }),
     });
+    const lastBubble = chatRoomMessages.querySelector('.chat-bubble--mine:last-of-type');
+    if (lastBubble) lastBubble.dataset.msgId = saved.id;
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
       state.ws.send(JSON.stringify({
         type: 'message',
+        id: saved.id,
         chat_id: saved.chat_id,
         sender_public_id: saved.sender_public_id,
         recipient_public_id: saved.recipient_public_id,
         content: saved.content,
+        read: false,
         created_at: saved.created_at,
       }));
     }
@@ -664,12 +694,17 @@ function connectWebSocket() {
       if (data.type === 'message' && data.sender_public_id !== state.publicId) {
         hideTypingIndicator();
         if (state.activeChatId === data.chat_id && !chatRoomOverlay.classList.contains('hidden')) {
-          appendChatMessage(data.sender_public_id, data.content, data.created_at);
+          appendChatMessage(data.sender_public_id, data.content, data.created_at, data.id, data.read);
           scrollChatToBottom();
+          setTimeout(markChatRead, 300);
         } else {
           state.unreadCounts[data.chat_id] = (state.unreadCounts[data.chat_id] || 0) + 1;
           updateChatBadge();
           renderChats();
+        }
+      } else if (data.type === 'read') {
+        if (state.activeChatId === data.chat_id) {
+          updateTicksToRead();
         }
       } else if (data.type === 'typing' && data.sender_public_id !== state.publicId) {
         if (state.activeChatId === data.chat_id && !chatRoomOverlay.classList.contains('hidden')) {

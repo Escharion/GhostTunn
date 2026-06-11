@@ -166,6 +166,23 @@ async def get_messages(session: AsyncSession, chat_id: int, limit: int = 100):
     return result.scalars().all()
 
 
+async def mark_messages_read(session: AsyncSession, chat_id: int, reader_public_id: str):
+    reader = await get_user_by_public(session, reader_public_id)
+    if not reader:
+        return []
+    stmt = (
+        select(Message)
+        .where(Message.chat_id == chat_id, Message.recipient_id == reader.id, Message.read == False)
+        .options(selectinload(Message.sender), selectinload(Message.recipient))
+    )
+    result = await session.execute(stmt)
+    messages = result.scalars().all()
+    for msg in messages:
+        msg.read = True
+    await session.commit()
+    return messages
+
+
 async def get_notifications(session: AsyncSession, public_id: str):
     user = await get_user_by_public(session, public_id)
     if not user:

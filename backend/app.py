@@ -20,6 +20,7 @@ from crud import (
     get_user_by_private,
     get_user_by_public,
     get_user_chats,
+    mark_messages_read,
     toggle_like,
 )
 from database import Base, engine, get_session
@@ -58,6 +59,12 @@ app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 async def on_startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        try:
+            await conn.execute(__import__("sqlalchemy").text(
+                "ALTER TABLE messages ADD COLUMN read BOOLEAN DEFAULT FALSE"
+            ))
+        except Exception:
+            pass
 
 
 @app.get("/", include_in_schema=False)
@@ -251,6 +258,7 @@ async def fetch_messages(chat_id: int, session: AsyncSession = Depends(get_sessi
             sender_public_id=message.sender.public_id,
             recipient_public_id=message.recipient.public_id,
             content=message.content,
+            read=message.read or False,
             created_at=message.created_at,
         )
         for message in messages
@@ -274,6 +282,7 @@ async def send_message(payload: MessageCreate, session: AsyncSession = Depends(g
             "sender_public_id": message.sender.public_id,
             "recipient_public_id": message.recipient.public_id,
             "content": message.content,
+            "read": False,
             "created_at": message.created_at.isoformat(),
         }
         await manager.broadcast_to_pair(
@@ -287,6 +296,7 @@ async def send_message(payload: MessageCreate, session: AsyncSession = Depends(g
             sender_public_id=message.sender.public_id,
             recipient_public_id=message.recipient.public_id,
             content=message.content,
+            read=message.read or False,
             created_at=message.created_at,
         )
     except ValueError as exc:
@@ -325,6 +335,17 @@ async def websocket_endpoint(websocket: WebSocket, public_id: str, session: Asyn
                     )
                 except Exception as e:
                     await websocket.send_json({"type": "error", "message": str(e)})
+            elif msg_type == "read":
+                chat_id = data.get("chat_id")
+                if chat_id:
+                    read_msgs = await mark_messages_read(session, chat_id, public_id)
+                    if read_msgs:
+                        sender_id = read_msgs[0].sender.public_id
+                        await manager.send_to(sender_id, {
+                            "type": "read",
+                            "chat_id": chat_id,
+                            "reader_public_id": public_id,
+                        })
             elif msg_type == "typing":
                 recipient_id = data.get("recipient_public_id")
                 if recipient_id:

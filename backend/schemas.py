@@ -67,6 +67,7 @@ class MessageResponse(BaseModel):
     sender_public_id: str
     recipient_public_id: str
     content: str
+    read: bool = False
     created_at: datetime
 
     class Config:
