@@ -77,6 +77,15 @@
   </div>
 
   <div id="appShell" class="screen screen--app hidden">
+    <aside class="side-nav">
+      <button class="side-nav-item" data-target="homeView">👻</button>
+      <button class="side-nav-item" data-target="chatsView">💬</button>
+      <button class="side-nav-item" data-target="terminalView">⌨️</button>
+      <button class="side-nav-item" data-target="vaultView">🗄️</button>
+      <button class="side-nav-item" data-target="marketView">🏷️</button>
+      <button class="side-nav-item" data-target="accountView">👤</button>
+    </aside>
+
     <div class="app-header">
       <div class="brand-block">
         <div class="app-logo logo-ring logo-ring--small" aria-hidden="true"></div>
@@ -148,6 +157,29 @@
             <input type="text" id="terminalInput" class="terminal-input" placeholder="ghost help" autocomplete="off" spellcheck="false" />
           </div>
         </div>
+      </section>
+
+      <section id="vaultView" class="content-view hidden">
+        <div class="section-title"><h2>Vault</h2><p>Your uploaded files and shared assets.</p></div>
+        <div class="home-card">
+          <div class="section-title"><h3>Upload to Vault</h3></div>
+          <input type="file" id="vaultFileInput" />
+          <input type="text" id="vaultFileName" placeholder="Optional filename" />
+          <div style="margin-top:0.75rem"><button class="btn btn-primary" id="vaultUploadBtn">Upload (encrypted)</button></div>
+        </div>
+        <div id="vaultList" class="feed-list"></div>
+      </section>
+
+      <section id="marketView" class="content-view hidden">
+        <div class="section-title"><h2>Market</h2><p>Create a public store (advertising only).</p></div>
+        <div class="home-card">
+          <div class="section-title"><h3>Create Store</h3></div>
+          <input type="text" id="storeName" placeholder="Store name" />
+          <input type="text" id="storeLink" placeholder="Seller contact link (WhatsApp/Facebook)" />
+          <input type="file" id="storeImage" />
+          <div style="margin-top:0.75rem"><button class="btn btn-primary" id="createStoreBtn">Create Store</button></div>
+        </div>
+        <div id="marketList" class="feed-list"></div>
       </section>
 
       <section id="accountView" class="content-view hidden">

@@ -339,6 +339,69 @@ code {
   flex-shrink: 0;
 }
 
+/* Left side vertical navigation */
+.side-nav {
+  position: fixed;
+  left: 1rem;
+  top: calc(var(--header-h) + 2rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  z-index: 60;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 8px 6px;
+  /* prevent the nav from being clipped on shorter screens */
+  max-height: calc(100vh - var(--header-h) - 3rem);
+  overflow-y: auto;
+}
+.side-nav-item {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.04);
+  color: var(--muted);
+  font-size: 1.4rem;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.side-nav-item:hover, .side-nav-item.active {
+  background: rgba(244,193,83,0.12);
+  color: var(--text);
+}
+
+/* Ensure account/profile and vault icons match terminal size and are visible */
+.side-nav-item[data-target="accountView"],
+.side-nav-item[data-target="vaultView"] {
+  width: 56px;
+  height: 56px;
+}
+
+.side-nav-item[data-target="vaultView"] {
+  box-shadow: 0 6px 18px rgba(0,0,0,0.28);
+}
+
+/* Make sure the account/profile icon matches the other nav items */
+.side-nav-item[data-target="accountView"] {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  font-size: 1.4rem;
+}
+
+/* Hide the raw file input; the Vault icon triggers the chooser */
+#vaultFileInput {
+  display: none;
+}
+
+/* Make room for side-nav */
+.app-content { margin-left: 84px; }
+
+.vault-file-row { display:flex; gap:0.5rem; align-items:center; }
+.vault-file-row input[type="text"] { flex:1; border-radius:12px; padding:0.6rem; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.03); }
+
 .brand-block {
   display: flex;
   align-items: center;

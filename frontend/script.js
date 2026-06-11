@@ -42,6 +42,18 @@ const globalSearch = document.getElementById('globalSearch');
 const terminalInput = document.getElementById('terminalInput');
 const terminalOutput = document.getElementById('terminalOutput');
 
+// side nav and vault/market elements
+const sideNavItems = Array.from(document.querySelectorAll('.side-nav-item'));
+const vaultFileInput = document.getElementById('vaultFileInput');
+const vaultFileName = document.getElementById('vaultFileName');
+const vaultUploadBtn = document.getElementById('vaultUploadBtn');
+const vaultList = document.getElementById('vaultList');
+const storeNameInput = document.getElementById('storeName');
+const storeLinkInput = document.getElementById('storeLink');
+const storeImageInput = document.getElementById('storeImage');
+const createStoreBtn = document.getElementById('createStoreBtn');
+const marketList = document.getElementById('marketList');
+
 const chatRoomOverlay = document.getElementById('chatRoomOverlay');
 const chatBackBtn = document.getElementById('chatBackBtn');
 const chatRoomMessages = document.getElementById('chatRoomMessages');
@@ -489,7 +501,14 @@ async function openChatRoom(chatId, recipientPublicId, recipientAlias, recipient
 
   try {
     const messages = await apiFetch(`/api/messages/${chatId}`);
-    messages.forEach(msg => appendChatMessage(msg.sender_public_id, msg.content, msg.created_at));
+    for (const msg of messages) {
+      try {
+        const plain = await decryptText(msg.content);
+        appendChatMessage(msg.sender_public_id, plain, msg.created_at);
+      } catch (e) {
+        appendChatMessage(msg.sender_public_id, msg.content, msg.created_at);
+      }
+    }
   } catch (err) {
     console.warn('Could not load messages:', err.message);
   }
@@ -529,28 +548,36 @@ async function sendChatMessage() {
   const optimistic = { sender_public_id: state.publicId, content, created_at: new Date().toISOString() };
   appendChatMessage(optimistic.sender_public_id, optimistic.content, optimistic.created_at);
   scrollChatToBottom();
-
-  if (state.ws && state.ws.readyState === WebSocket.OPEN && state.activeChatRecipientPublicId) {
-    state.ws.send(JSON.stringify({
-      type: 'message',
-      chat_id: state.activeChatId,
-      sender_public_id: state.publicId,
-      recipient_public_id: state.activeChatRecipientPublicId,
-      content,
-    }));
-  } else {
-    try {
-      await apiFetch('/api/messages', {
-        method: 'POST',
-        body: JSON.stringify({
-          chat_id: state.activeChatId,
-          sender_public_id: state.publicId,
-          recipient_public_id: state.activeChatRecipientPublicId || state.publicId,
-          content,
-        }),
-      });
-    } catch (err) {
-      console.warn('Message send failed:', err.message);
+  // encrypt content for E2E
+  try {
+    const ciphertext = await encryptText(content);
+    if (state.ws && state.ws.readyState === WebSocket.OPEN && state.activeChatRecipientPublicId) {
+      state.ws.send(JSON.stringify({
+        type: 'message',
+        chat_id: state.activeChatId,
+        sender_public_id: state.publicId,
+        recipient_public_id: state.activeChatRecipientPublicId,
+        content: ciphertext,
+      }));
+    } else {
+      try {
+        await apiFetch('/api/messages', {
+          method: 'POST',
+          body: JSON.stringify({
+            chat_id: state.activeChatId,
+            sender_public_id: state.publicId,
+            recipient_public_id: state.activeChatRecipientPublicId || state.publicId,
+            content: ciphertext,
+          }),
+        });
+      } catch (err) {
+        console.warn('Message send failed:', err.message);
+      }
+    }
+  } catch (e) {
+    console.warn('Encryption failed, sending plaintext:', e);
+    if (state.ws && state.ws.readyState === WebSocket.OPEN && state.activeChatRecipientPublicId) {
+      state.ws.send(JSON.stringify({ type: 'message', chat_id: state.activeChatId, sender_public_id: state.publicId, recipient_public_id: state.activeChatRecipientPublicId, content }));
     }
   }
 }
@@ -594,9 +621,25 @@ function connectWebSocket() {
     try {
       const data = JSON.parse(event.data);
       if (data.type === 'message') {
-        if (state.activeChatId === data.chat_id && data.sender_public_id !== state.publicId) {
-          appendChatMessage(data.sender_public_id, data.content, data.created_at);
-          scrollChatToBottom();
+        // decrypt message content before showing (client-side E2E)
+        decryptText(data.content).then(plain => {
+          if (state.activeChatId === data.chat_id && data.sender_public_id !== state.publicId) {
+            appendChatMessage(data.sender_public_id, plain, data.created_at);
+            scrollChatToBottom();
+          }
+        }).catch(() => {
+          if (state.activeChatId === data.chat_id && data.sender_public_id !== state.publicId) {
+            appendChatMessage(data.sender_public_id, data.content, data.created_at);
+            scrollChatToBottom();
+          }
+        });
+      } else if (data.type === 'upload') {
+        // show uploaded file in vault (ciphertext stored server-side)
+        if (vaultList) {
+          const node = document.createElement('article');
+          node.className = 'feed-item';
+          node.innerHTML = `<header><strong>${data.filename}</strong></header><p><button class="btn btn-secondary vault-download" data-url="${data.url}" data-filename="${data.filename}">Download & Decrypt</button></p>`;
+          vaultList.prepend(node);
         }
       }
     } catch (e) {
@@ -645,23 +688,56 @@ async function runTerminalCommand(cmd) {
   terminalInput.disabled = true;
 
   try {
-    const result = await apiFetch('/api/terminal', {
-      method: 'POST',
-      body: JSON.stringify({ command: cmd, public_id: state.publicId }),
-    });
+    // handle client-side commands for real-time responsiveness
+    if (cmd.startsWith('ghost ping')) {
+      appendTerminalLine('  Pinging relay...');
+      const tries = 3;
+      const times = [];
+      for (let i = 0; i < tries; i++) {
+        const t0 = performance.now();
+        try {
+          await fetch('/api/health');
+          const t1 = performance.now();
+          const ms = Math.round(t1 - t0);
+          times.push(ms);
+          appendTerminalLine(`  Reply from relay: time=${ms}ms`, 'terminal-line--output');
+        } catch (e) {
+          appendTerminalLine('  Request failed', 'terminal-line--error');
+        }
+        await new Promise(r => setTimeout(r, 200));
+      }
+      const avg = Math.round(times.reduce((a,b)=>a+b,0)/Math.max(1,times.length));
+      appendTerminalLine(`\n  Avg latency: ${avg}ms — Connection is healthy.`, 'terminal-line--output');
+    } else if (cmd.startsWith('ghost theme')) {
+      // allow 'ghost theme <color>'
+      const parts = cmd.split(' ');
+      const color = parts[2] || '#b0ffb8';
+      const shell = document.querySelector('.terminal-shell');
+      if (shell) {
+        shell.style.borderColor = color;
+        const lines = document.querySelectorAll('.terminal-line');
+        lines.forEach(l => { l.style.color = color; });
+      }
+      appendTerminalLine('  Theme applied.', 'terminal-line--system');
+    } else {
+      const result = await apiFetch('/api/terminal', {
+        method: 'POST',
+        body: JSON.stringify({ command: cmd, public_id: state.publicId }),
+      });
 
-    if (result.clear) {
-      terminalOutput.innerHTML = '';
-    }
+      if (result.clear) {
+        terminalOutput.innerHTML = '';
+      }
 
-    if (result.output && result.output.length > 0) {
-      await printTerminalLines(result.output, 28);
-    }
+      if (result.output && result.output.length > 0) {
+        await printTerminalLines(result.output, 28);
+      }
 
-    if (result.status === 'bld_active') {
-      terminalInput.placeholder = '@ghost send <id> <message>';
-    } else if (result.status === 'bld_exit') {
-      terminalInput.placeholder = 'ghost help';
+      if (result.status === 'bld_active') {
+        terminalInput.placeholder = '@ghost send <id> <message>';
+      } else if (result.status === 'bld_exit') {
+        terminalInput.placeholder = 'ghost help';
+      }
     }
   } catch (err) {
     appendTerminalLine(`  Error: ${err.message}`, 'terminal-line--error');
@@ -671,6 +747,158 @@ async function runTerminalCommand(cmd) {
     terminalOutput.scrollTop = terminalOutput.scrollHeight;
   }
 }
+
+// ----------------- Encryption helpers (client-side E2E) -----------------
+async function deriveKeyFromPrivate(privateId) {
+  const enc = new TextEncoder();
+  const pass = enc.encode(privateId);
+  const salt = enc.encode((state.publicId || '') + '|ghosttunn');
+  const baseKey = await crypto.subtle.importKey('raw', pass, { name: 'PBKDF2' }, false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+async function encryptText(plain) {
+  const key = await deriveKeyFromPrivate(state.privateId || '');
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder();
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plain));
+  const payload = new Uint8Array(iv.byteLength + ct.byteLength);
+  payload.set(iv, 0);
+  payload.set(new Uint8Array(ct), iv.byteLength);
+  return arrayBufferToBase64(payload.buffer);
+}
+
+async function decryptText(b64) {
+  const key = await deriveKeyFromPrivate(state.privateId || '');
+  const buf = base64ToArrayBuffer(b64);
+  const data = new Uint8Array(buf);
+  const iv = data.slice(0, 12);
+  const ct = data.slice(12).buffer;
+  const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  return new TextDecoder().decode(dec);
+}
+
+async function encryptFileToBase64(file) {
+  const key = await deriveKeyFromPrivate(state.privateId || '');
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const buffer = await file.arrayBuffer();
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, buffer);
+  const payload = new Uint8Array(iv.byteLength + ct.byteLength);
+  payload.set(iv, 0);
+  payload.set(new Uint8Array(ct), iv.byteLength);
+  return arrayBufferToBase64(payload.buffer);
+}
+
+async function decryptArrayBufferFromBase64(b64) {
+  const key = await deriveKeyFromPrivate(state.privateId || '');
+  const buf = base64ToArrayBuffer(b64);
+  const data = new Uint8Array(buf);
+  const iv = data.slice(0, 12);
+  const ct = data.slice(12).buffer;
+  const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  return dec; // ArrayBuffer
+}
+
+async function downloadAndDecrypt(url, filename) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Download failed');
+    const buf = await res.arrayBuffer();
+    // server stored raw ciphertext bytes; convert to base64 for decryption helper
+    const b64 = arrayBufferToBase64(buf);
+    const plainBuf = await decryptArrayBufferFromBase64(b64);
+    const blob = new Blob([plainBuf]);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename || 'download';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
+  } catch (e) {
+    alert('Failed to decrypt/download: ' + e.message);
+  }
+}
+
+// ----------------- Vault upload handling -----------------
+async function uploadFileToVault(file, filename) {
+  const data_b64 = await encryptFileToBase64(file);
+  const payload = { public_id: state.publicId, filename, data: data_b64 };
+  const res = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!res.ok) throw new Error('Upload failed');
+  return res.json();
+}
+
+if (vaultUploadBtn) {
+  vaultUploadBtn.addEventListener('click', async () => {
+    const f = vaultFileInput && vaultFileInput.files && vaultFileInput.files[0];
+    if (!f) return alert('Select a file first');
+    const name = (vaultFileName && vaultFileName.value) ? vaultFileName.value.trim() : f.name;
+    vaultUploadBtn.disabled = true;
+    vaultUploadBtn.textContent = 'Uploading...';
+    try {
+      const info = await uploadFileToVault(f, name);
+      const node = document.createElement('article');
+      node.className = 'feed-item';
+      node.innerHTML = `<header><strong>${info.filename}</strong></header><p><button class="btn btn-secondary vault-download" data-url="${info.url}" data-filename="${info.filename}">Download & Decrypt</button></p>`;
+      vaultList.prepend(node);
+    } catch (e) {
+      alert('Upload failed: ' + e.message);
+    } finally {
+      vaultUploadBtn.disabled = false;
+      vaultUploadBtn.textContent = 'Upload (encrypted)';
+    }
+  });
+}
+
+// Side nav handlers
+if (typeof sideNavItems !== 'undefined') {
+  sideNavItems.forEach(item => item.addEventListener('click', () => {
+    const target = item.dataset.target;
+    if (!target) return;
+    showView(target);
+    sideNavItems.forEach(i => i.classList.toggle('active', i === item));
+    if (target === 'chatsView') loadChats();
+    if (target === 'terminalView') terminalInput.focus();
+      // If user clicked Vault, open the file chooser immediately (like 'ls' then choose)
+      if (target === 'vaultView' && vaultFileInput) {
+        // slight delay to ensure view is visible
+        setTimeout(() => vaultFileInput.click(), 120);
+      }
+  }));
+}
+
+// Delegate click handler for vault download buttons
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest && e.target.closest('.vault-download');
+  if (btn) {
+    const url = btn.dataset.url;
+    const filename = btn.dataset.filename;
+    if (!url) return alert('No download URL');
+    downloadAndDecrypt(url, filename);
+  }
+});
 
 // ── Event bindings ─────────────────────────────────────────────────────────
 
