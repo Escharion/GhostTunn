@@ -207,6 +207,8 @@
             <button class="sidebar-icon" data-view="chat" aria-label="Chats" title="Chats">💬</button>
             <button class="sidebar-icon" data-view="ghosttime" aria-label="GhostTime" title="GhostTime">📝</button>
             <button class="sidebar-icon" data-view="terminal" aria-label="Terminal" title="Terminal">⌨️</button>
+            <button class="sidebar-icon" data-view="vault" id="vaultButton" aria-label="Vault" title="Vault">🗄️</button>
+            <button class="sidebar-icon" data-view="market" id="marketButton" aria-label="Market" title="Market">🛒</button>
           </div>
           <div class="sidebar-bottom">
             <button class="sidebar-avatar-btn" id="sidebarProfileBtn" aria-label="Profile & Settings" title="Profile & Settings">
@@ -245,6 +247,11 @@
                 <button class="chat-tab" data-filter="requests">Requests</button>
               </div>
               <div class="chat-list" id="chatList"></div>
+              <!-- Moved message input area into chat column and aligned to left/top -->
+              <div class="message-input-area hidden chat-compose" id="messageInputArea">
+                <input type="text" id="messageInput" placeholder="Type a message..." />
+                <button class="send-button" id="sendButton">Send</button>
+              </div>
             </div>
           </div>
 
@@ -291,7 +298,33 @@
             </div>
           </div>
 
-        </div>
+          
+          <!-- Vault view moved inside app-main so it lines up with chat content -->
+          <div class="view-panel hidden" id="vaultView">
+            <div class="vault-panel">
+              <div class="section-title"><h2>Vault</h2><p>Your uploaded files and encrypted assets.</p></div>
+              <div class="vault-actions">
+                <input type="file" id="vaultFileInput" />
+                <input type="text" id="vaultFileName" placeholder="Optional filename" />
+                <div style="margin-top:0.5rem"><button class="btn btn-primary" id="vaultUploadBtn">Upload (encrypted)</button></div>
+              </div>
+              <div id="vaultList" class="feed-list"></div>
+            </div>
+          </div>
+
+          <!-- Market view moved inside app-main so it lines up with chat content -->
+          <div class="view-panel hidden" id="marketView">
+            <div class="market-panel">
+              <div class="section-title"><h2>Market</h2><p>Public store listings and seller posts.</p></div>
+              <div class="market-actions">
+                <input type="text" id="storeName" placeholder="Store name" />
+                <input type="text" id="storeLink" placeholder="Seller contact link (optional)" />
+                <input type="file" id="storeImage" />
+                <div style="margin-top:0.5rem"><button class="btn btn-primary" id="createStoreBtn">Create Store</button></div>
+              </div>
+              <div id="marketList" class="feed-list"></div>
+            </div>
+          </div>
 
         <div class="chat-detail-panel hidden" id="chatDetailPanel">
           <div class="chat-header">
@@ -322,6 +355,14 @@
         <button class="mobile-nav-btn" data-view="terminal" aria-label="Terminal">
           <span class="mobile-nav-icon">⌨️</span>
           <span class="mobile-nav-label">Terminal</span>
+        </button>
+        <button class="mobile-nav-btn" data-view="vault" aria-label="Vault">
+          <span class="mobile-nav-icon">🗄️</span>
+          <span class="mobile-nav-label">Vault</span>
+        </button>
+        <button class="mobile-nav-btn" data-view="market" aria-label="Market">
+          <span class="mobile-nav-icon">🛒</span>
+          <span class="mobile-nav-label">Market</span>
         </button>
         <button class="mobile-nav-btn" id="mobileProfileBtn" aria-label="Profile">
           <span class="mobile-nav-icon">

@@ -66,6 +66,7 @@ const chatDetailPanel     = document.getElementById('chatDetailPanel'); // slidi
 const messageInputArea    = document.getElementById('messageInputArea');// compose bar (hidden until chat opens)
 const searchActionRow     = document.querySelector('.search-action-row');// search + add-friend row
 const appTopbar           = document.querySelector('.app-topbar');       // mobile top bar
+const appTitle            = document.querySelector('.app-title');        // app title element in topbar
 const backToChatListButton = document.getElementById('backToChatListButton'); // ← back in chat detail
 const chatDetailTitle     = document.getElementById('chatDetailTitle'); // contact name in chat header
 const chatDetailSubtitle  = document.getElementById('chatDetailSubtitle'); // online status / public key
@@ -86,6 +87,8 @@ const terminalView   = document.getElementById('terminalView');   // the termina
 const terminalOutput = document.getElementById('terminalOutput'); // terminal line output area
 const terminalInput  = document.getElementById('terminalInput');  // the single-line command input
 const terminalClear  = document.getElementById('terminalClear');  // "clear" button
+const vaultView      = document.getElementById('vaultView');      // vault files view
+const marketView     = document.getElementById('marketView');     // market/store view
 
 // ── Security section elements (landing page) ──────────────────
 const copySecurityIdentity = document.getElementById('copySecurityIdentity'); // copy identity in security section
@@ -230,6 +233,7 @@ const DEVICE_STORAGE_KEY   = 'ghostDeviceId';    // unique device ID (generated 
 const PUBLIC_STORAGE_KEY   = 'ghostPublicKey';   // e.g. #ghost-ciphernexus-1042-E
 const PRIVATE_STORAGE_KEY  = 'ghostPrivateKey';  // e.g. @Ghost-Abc1234
 const IDENTITY_STORAGE_KEY = 'ghostIdentityKey'; // combined: publicKey + " " + rawPrivate
+const VAULT_STORAGE_KEY    = 'ghostVaultFiles'; // persisted vault files (JSON)
 
 // ─── Notification data ────────────────────────────────────────
 const notifications = [
@@ -725,6 +729,8 @@ function switchAppView(view) {
   if (chatView) chatView.classList.toggle('hidden', view !== 'chat');
   if (ghosttimeView) ghosttimeView.classList.toggle('hidden', view !== 'ghosttime');
   if (terminalView) terminalView.classList.toggle('hidden', view !== 'terminal');
+  if (vaultView) vaultView.classList.toggle('hidden', view !== 'vault');
+  if (marketView) marketView.classList.toggle('hidden', view !== 'market');
   if (accountView) accountView.classList.toggle('hidden', view !== 'account');
 
   sidebarIcons.forEach((icon) => {
@@ -740,6 +746,29 @@ function switchAppView(view) {
     // Close any open detail panel so we see the feed
     if (chatDetailPanel) chatDetailPanel.classList.add('hidden');
     chatDetailPanel?.classList.remove('show');
+  }
+
+  // Update the app title shown in the topbar to match the active view
+  if (appTitle) {
+    const names = {
+      chat: '',
+      ghosttime: 'GhostTime',
+      terminal: 'Terminal',
+      vault: 'Vault',
+      market: 'Market',
+      account: 'Account'
+    };
+    const t = names[view] !== undefined ? names[view] : '';
+    appTitle.textContent = t;
+    appTitle.classList.toggle('vault-name', view === 'vault');
+  }
+
+  if (view === 'vault') {
+    renderVaultView();
+  }
+
+  if (view === 'market') {
+    renderMarketView();
   }
 
   if (searchActionRow) searchActionRow.classList.toggle('hidden', view !== 'chat');
@@ -920,6 +949,193 @@ function handlePublishGtPost() {
   gtPostText.value = '';
   renderGtPosts();
 }
+
+// ─── VAULT & MARKET (client-side) ──────────────────────────
+// Lightweight client-side vault persisted to localStorage and a
+// simple mock market that saves purchased items into the vault.
+
+let vaultFiles = [];
+
+const marketItems = [
+  { id: 'm1', title: 'Encrypted Template', price: 3.5, description: 'A minimal encrypted note template.' },
+  { id: 'm2', title: 'Relay Config', price: 5.0, description: 'Sample relay configuration for private routing.' },
+  { id: 'm3', title: 'Ghost Notepad', price: 1.0, description: 'Tiny plaintext notepad for quick journaling.' }
+];
+
+function loadVaultFromStorage() {
+  try {
+    const raw = localStorage.getItem(VAULT_STORAGE_KEY);
+    vaultFiles = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    vaultFiles = [];
+  }
+}
+
+function saveVaultToStorage() {
+  localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(vaultFiles));
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '0 B';
+  const units = ['B','KB','MB','GB'];
+  let i = 0;
+  while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+  return `${Math.round(bytes * 10) / 10} ${units[i]}`;
+}
+
+function formatTime(ts) {
+  const d = new Date(ts);
+  return d.toLocaleString();
+}
+
+function renderVaultView() {
+  if (!vaultView) return;
+  loadVaultFromStorage();
+  vaultView.innerHTML = `
+    <div class="vault-header">
+      <h3>Your Vault</h3>
+      <div><button id="vaultUploadBtn" class="btn btn-primary">Upload file</button></div>
+    </div>
+    <div id="vaultList" class="vault-list"></div>
+  `;
+
+  const list = vaultView.querySelector('#vaultList');
+  if (!list) return;
+  if (vaultFiles.length === 0) {
+    list.innerHTML = '<div class="chat-empty">Your vault is empty. Upload files or buy items in the Market.</div>';
+  } else {
+    list.innerHTML = vaultFiles.map(f => `
+      <div class="vault-item" data-id="${f.id}">
+        <div class="vault-item-meta">
+          <strong>${f.name}</strong>
+          <span class="message-footer">${formatTime(f.uploadedAt)} · ${formatBytes(f.size)}</span>
+        </div>
+        <div class="vault-item-actions">
+          <button class="btn btn-secondary vault-download" data-id="${f.id}">Download</button>
+          <button class="btn btn-danger vault-delete" data-id="${f.id}">Delete</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  vaultView.querySelector('#vaultUploadBtn')?.addEventListener('click', handleVaultUpload);
+
+  list.querySelectorAll('.vault-download').forEach(btn => btn.addEventListener('click', (e) => {
+    const id = btn.dataset.id;
+    handleVaultDownload(id);
+  }));
+
+  list.querySelectorAll('.vault-delete').forEach(btn => btn.addEventListener('click', (e) => {
+    const id = btn.dataset.id;
+    handleVaultDelete(id);
+  }));
+}
+
+function handleVaultUpload() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  input.addEventListener('change', (e) => {
+    const files = Array.from(input.files || []);
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64 = ev.target.result.split(',')[1];
+        const entry = {
+          id: `vf-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+          name: file.name,
+          data: base64,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          uploadedAt: Date.now()
+        };
+        vaultFiles.unshift(entry);
+        saveVaultToStorage();
+        renderVaultView();
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+  input.click();
+}
+
+function handleVaultDownload(id) {
+  const f = vaultFiles.find(x => x.id === id);
+  if (!f) return alert('File not found');
+  const byteString = atob(f.data);
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+  const blob = new Blob([ab], { type: f.type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = f.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function handleVaultDelete(id) {
+  if (!confirm('Delete this file from your vault?')) return;
+  vaultFiles = vaultFiles.filter(x => x.id !== id);
+  saveVaultToStorage();
+  renderVaultView();
+}
+
+function renderMarketView() {
+  if (!marketView) return;
+  marketView.innerHTML = `
+    <div class="market-header"><h3>Market</h3></div>
+    <div id="marketList" class="market-list"></div>
+  `;
+  const list = marketView.querySelector('#marketList');
+  list.innerHTML = marketItems.map(item => `
+    <div class="market-item" data-id="${item.id}">
+      <div class="market-item-meta">
+        <strong>${item.title}</strong>
+        <div class="message-footer">${item.description}</div>
+      </div>
+      <div class="market-item-actions">
+        <button class="btn btn-primary market-buy" data-id="${item.id}">Buy — $${item.price}</button>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.market-buy').forEach(btn => btn.addEventListener('click', () => {
+    const id = btn.dataset.id;
+    handleMarketPurchase(id);
+  }));
+}
+
+async function handleMarketPurchase(id) {
+  const item = marketItems.find(i => i.id === id);
+  if (!item) return;
+  const content = `Purchased: ${item.title}\n\nDescription: ${item.description}\nDate: ${new Date().toISOString()}`;
+  const blob = new Blob([content], { type: 'text/plain' });
+  const base64 = await new Promise((res) => {
+    const r = new FileReader();
+    r.onload = (e) => res(e.target.result.split(',')[1]);
+    r.readAsDataURL(blob);
+  });
+  const entry = {
+    id: `vf-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    name: `${item.title.replace(/\s+/g,'_')}.txt`,
+    data: base64,
+    type: 'text/plain',
+    size: content.length,
+    uploadedAt: Date.now()
+  };
+  loadVaultFromStorage();
+  vaultFiles.unshift(entry);
+  saveVaultToStorage();
+  alert(`Purchased "${item.title}" — saved to your Vault.`);
+  renderMarketView();
+}
+
+// ensure vault is loaded on startup
+loadVaultFromStorage();
 
 // ─── 13. SEARCH & CONTACTS ───────────────────────────────────
 
